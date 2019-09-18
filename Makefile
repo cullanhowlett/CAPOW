@@ -9,7 +9,8 @@ EXEC = CAPOW
 #MACHINE = DOGMATIX
 #MACHINE = GETAFIX
 #MACHINE = TINAROO
-MACHINE = LAPTOP
+#MACHINE = LAPTOP
+MACHINE = CORI
 
 # Options for optimization
 # ========================
@@ -71,6 +72,16 @@ ifeq ($(MACHINE),LAPTOP)
   GSL_LIBS  = -L/opt/local/lib/ -lgsl -lgslcblas
   MPI_INCL  = -I/opt/local/include/openmpi-mp/
   MPI_LIBS  = -L/opt/local/lib/openmpi-mp/  -lmpi
+endif
+
+ifeq ($(MACHINE),CORI)
+  CC = cc -openmp
+  FFTW_INCL = -I/opt/cray/pe/fftw/3.3.8.2/mic_knl/include/
+  FFTW_LIBS = -L/opt/cray/pe/fftw/3.3.8.2/mic_knl/lib/ -lfftw3_mpi -lfftw3
+  GSL_INCL  = -I/global/common/sw/cray/cnl7/haswell/gsl/2.5/intel/19.0.3.199/7twqxxq/include/
+  GSL_LIBS  = -L/global/common/sw/cray/cnl7/haswell/gsl/2.5/intel/19.0.3.199/7twqxxq/lib/ -lgsl -lgslcblas
+  MPI_INCL  = -I/opt/cray/pe/mpt/7.7.6/gni/mpich-intel/16.0/include/
+  MPI_LIBS  = -L/opt/cray/pe/mpt/7.7.6/gni/mpich-intel/16.0/lib/  -lmpich
 endif
 
 # Compile the code
