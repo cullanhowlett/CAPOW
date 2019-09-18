@@ -291,7 +291,7 @@ void output_power(double shot, double norm) {
 
     FILE *fout, *fout_2D;
     char fout_name[2000], fout_name_2D[2000];
-    sprintf(fout_name, "%s/%s.lpow", InputDir, FileBase);
+    sprintf(fout_name, "%s/%s.lpow", OutputDir, FileBase);
     if (ThisTask == 0) {
       if((fout=fopen(fout_name,"w"))==NULL) { printf("cannot open output file: %s\n", fout_name); FatalError("read_data", 142); }
       printf("Writing multipoles to file: %s\n",fout_name);
