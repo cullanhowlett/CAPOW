@@ -38,6 +38,7 @@ int main(int argc, char **argv) {
     if(ThisTask == 0) {
       fprintf(stdout, "Input parameters not found\n");
       fprintf(stdout, "Call with <ParameterFile>\n");
+      fflush(stdout);
     }
     ierr = MPI_Finalize();
     exit(1);
@@ -48,24 +49,28 @@ int main(int argc, char **argv) {
   if (ThisTask == 0) {
     printf("\nReading Input Parameters and setting up CAPOW\n");
     printf("=============================================\n");
+    fflush(stdout);
   }
   read_parameterfile(argv[1]);
 
   if (ThisTask == 0) {
     printf("\nAllocating grid\n"); 
     printf("===============\n");
+    fflush(stdout);
   }
   create_grids();
 
   if (ThisTask == 0) {
     printf("\nReading input data and assigning to grid\n"); 
     printf("========================================");
+    fflush(stdout);
   }
   double NGRID = read_data_serial_ascii();
 
   if (ThisTask == 0) {
     printf("\nComputing shot-noise, normalisation and preparing for FFT\n"); 
     printf("=========================================================\n");
+    fflush(stdout);
   }
 
   // Sum over all processors to get the global quantities
@@ -100,6 +105,7 @@ int main(int argc, char **argv) {
   if (ThisTask == 0) {
     printf("\nFourier transforming overdensity field\n"); 
     printf("======================================\n");
+    fflush(stdout);
   }
   fftw_execute(plan);
   if (DoInterlacing) fftw_execute(plan_2);
@@ -107,18 +113,21 @@ int main(int argc, char **argv) {
   if (ThisTask == 0) {
     printf("\nIterating over grid cells\n"); 
     printf("=========================\n");
+    fflush(stdout);
   }
   compute_power();
 
   if (ThisTask == 0) {
     printf("\nOutputting power spectra\n"); 
     printf("========================\n");
+    fflush(stdout);
   }
   output_power(shot, norm);
 
   if (ThisTask == 0) {
     printf("\nCleaning up\n"); 
     printf("===========\n");
+    fflush(stdout);
   }
   MPI_Finalize();
 
@@ -295,10 +304,12 @@ void output_power(double shot, double norm) {
     if (ThisTask == 0) {
       if((fout=fopen(fout_name,"w"))==NULL) { printf("cannot open output file: %s\n", fout_name); FatalError("read_data", 142); }
       printf("Writing multipoles to file: %s\n",fout_name);
+      fflush(stdout);
       if (Output2D) {
         sprintf(fout_name_2D, "%s_2D", fout_name);
         if((fout_2D=fopen(fout_name_2D,"w"))==NULL) { printf("cannot open output file: %s\n", fout_name_2D); FatalError("read_data", 142); }
         printf("Writing 2D power spectrum to file:%s\n",fout_name_2D);
+        fflush(stdout);
       }
     }
 
@@ -330,6 +341,7 @@ void output_power(double shot, double norm) {
           kmax = Mink+((float)i+0.5)*binwidth;
         }
         printf("Last full bin: %d (k=%g)\n",i, kmax);
+        fflush(stdout);
         Pkfill[i]=0; Pk0_glob[i]=0.0; Pk2_glob[i]=0.0; Pk4_glob[i]=0.0; Nmodes_glob[i]=0.0; break;
       }
     }   
