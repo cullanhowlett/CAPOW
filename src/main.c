@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
 
   // Subtract the mean density
   int i, j, k;
-  #pragma omp parallel for private(i,j,k) collapse(3)
+  //#pragma omp parallel for private(i,j,k) collapse(3)
   for (i=0; i<Local_nx; i++) {
     for (j=0; j<NY; j++) {
       for (k=0; k<NZ; k++) {
@@ -160,7 +160,7 @@ void compute_power(void) {
   // Loop over all cells on this processor.
   int i, j, k;
   double sx = 1.0/((float)NX*dx), sy = 1.0/((float)NY*dy), sz = 1.0/((float)NZ*dz);
-  #pragma omp parallel for private(i,j,k) collapse(3) reduction(+:Pk0[:NK],Pk2[:NK],Pk4[:NK],Nmodes[:NK],Pk_2D[:NK*NMU],Nmodes_2D[:NK*NMU])
+  //#pragma omp parallel for private(i,j,k) collapse(3) reduction(+:Pk0[:NK],Pk2[:NK],Pk4[:NK],Nmodes[:NK],Pk_2D[:NK*NMU],Nmodes_2D[:NK*NMU])
   for (i=Local_x_start; i<Local_x_start+Local_nx; i++) {
     for (j=0; j<NY; j++) {
       for (k=0; k<=NZ/2; k++) {
@@ -204,8 +204,6 @@ void compute_power(void) {
         } else {
           kbin = (int)((float)(fktot-Mink)/binwidth);
         }
-        int mubin = (int)(mu*(float)NMU);
-        int bin = kbin*NMU + mubin;
 
         if ((kbin >= 0) && (kbin < NK) && (fktot <= min_nyquist)) {
     
@@ -256,6 +254,9 @@ void compute_power(void) {
           Pk4[kbin]   += L4*power;
           Nmodes[kbin]++;
           if (Output2D) {
+            int mubin = (int)(mu*(float)NMU);
+            if (mubin >= NMU) mubin = NMU-1;
+            int bin = kbin*NMU + mubin;
             if ((bin >= 0) && (bin < NK*NMU)) {
               Pk_2D[bin]    += power;
               Nmodes_2D[bin]++;
@@ -323,7 +324,9 @@ void output_power(double shot, double norm) {
         Pk4_glob[i] *= 9.0/(Nmodes_glob[i]*norm);
         Pkfill[i] = 1;
       }
-      if (Output2D) {
+    }
+    if (Output2D) {
+      for(int i=0;i<NK*NMU;i++) {
         if(Nmodes_2D_glob[i]>0.0) {
           Pk_2D_glob[i] /= Nmodes_2D_glob[i]*norm; 
         }

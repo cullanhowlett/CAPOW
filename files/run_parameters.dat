@@ -5,15 +5,15 @@
 % Inputs/Outputs
 % ==============
 InputDir             /Volumes/Work/UQ/DESI/MockChallenge     % Directory containing input files.
-OutputDir            /Volumes/Work/UQ/DESI/MockChallenge/CAPOW/files/                                  % Directory for output.
+OutputDir            /Volumes/Work/UQ/DESI/MockChallenge/                                  % Directory for output.
 FileBase             UNIT_DESI_Shadab_HOD_snap97_ELG_v0.txt  % Base-filename of output files (appropriate additions are appended at runtime) 
 NumFilesInParallel   1                                       % Limits the number of files that are reading the inputs at once.
 
 % Grid Specifications
 % ====================
-NX           1024     % The number of grid cells in the x direction.
-NY           1024     % The number of grid cells in the y direction.
-NZ           1024     % The number of grid cells in the z direction.
+NX           512     % The number of grid cells in the x direction.
+NY           512     % The number of grid cells in the y direction.
+NZ           512     % The number of grid cells in the z direction.
 XMIN         0.0     % The lower limit of the x-axis
 XMAX      1000.0     % The upper limit of the x-axis
 YMIN         0.0     % The lower limit of the y-axis

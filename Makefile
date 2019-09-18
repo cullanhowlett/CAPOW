@@ -9,8 +9,8 @@ EXEC = CAPOW
 #MACHINE = DOGMATIX
 #MACHINE = GETAFIX
 #MACHINE = TINAROO
-#MACHINE = LAPTOP
-MACHINE = CORI
+MACHINE = LAPTOP
+#MACHINE = CORI
 
 # Options for optimization
 # ========================
