@@ -85,10 +85,11 @@ int main(int argc, char **argv) {
   }
 
   // Subtract the mean density
+  int i, j, k;
   #pragma omp parallel for private(i,j,k) collapse(3)
-  for (int i=0; i<Local_nx; i++) {
-    for (int j=0; j<NY; j++) {
-      for (int k=0; k<NZ; k++) {
+  for (i=0; i<Local_nx; i++) {
+    for (j=0; j<NY; j++) {
+      for (k=0; k<NZ; k++) {
         unsigned long long ind = k+2*(NZ/2+1)*(j+NY*i);
         ddg[ind] -= mean;
         if (DoInterlacing) ddg_2[ind] -= mean;
@@ -148,11 +149,12 @@ void compute_power(void) {
   if (ny_z<min_nyquist) min_nyquist=ny_z;
 
   // Loop over all cells on this processor.
+  int i, j, k;
   double sx = 1.0/((float)NX*dx), sy = 1.0/((float)NY*dy), sz = 1.0/((float)NZ*dz);
   #pragma omp parallel for private(i,j,k) collapse(3) reduction(+:Pk0[:NK],Pk2[:NK],Pk4[:NK],Nmodes[:NK],Pk_2D[:NK*NMU],Nmodes_2D[:NK*NMU])
-  for (int i=Local_x_start; i<Local_x_start+Local_nx; i++) {
-    for (int j=0; j<NY; j++) {
-      for (int k=0; k<=NZ/2; k++) {
+  for (i=Local_x_start; i<Local_x_start+Local_nx; i++) {
+    for (j=0; j<NY; j++) {
+      for (k=0; k<=NZ/2; k++) {
   
         // frequency in x
         double fx;
