@@ -325,7 +325,6 @@ void output_power(double shot, double norm) {
       }
       if (Output2D) {
         if(Nmodes_2D_glob[i]>0.0) {
-          Pk_2D_glob[i] -= Nmodes_2D_glob[i]*shot; 
           Pk_2D_glob[i] /= Nmodes_2D_glob[i]*norm; 
         }
       }
