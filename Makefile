@@ -65,13 +65,13 @@ ifeq ($(MACHINE),TINAROO)
 endif
 
 ifeq ($(MACHINE),LAPTOP)
-  CC = mpicc -openmp
-  FFTW_INCL = -I/opt/local/include/
-  FFTW_LIBS = -L/opt/local/lib/ -lfftw3_mpi -lfftw3
-  GSL_INCL  = -I/opt/local/include/gsl/
-  GSL_LIBS  = -L/opt/local/lib/ -lgsl -lgslcblas
-  MPI_INCL  = -I/opt/local/include/openmpi-mp/
-  MPI_LIBS  = -L/opt/local/lib/openmpi-mp/  -lmpi
+  CC = mpicc
+  FFTW_INCL = -I/usr/local/include/
+  FFTW_LIBS = -L/usr/local/lib/ -lfftw3_mpi -lfftw3
+  GSL_INCL  = -I/usr/local/include/gsl/
+  GSL_LIBS  = -L/usr/local/lib/ -lgsl -lgslcblas
+  MPI_INCL  = -I/usr/local/include/openmpi/
+  MPI_LIBS  = -L/usr/local/lib/openmpi/  -lmpi
 endif
 
 ifeq ($(MACHINE),CORI)

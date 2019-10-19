@@ -237,11 +237,12 @@ void compute_power(void) {
  
           // This is necessary because we are only looping over half the grid in the z axis
           // so we need to fully account for the assumed hermitian symmetry in the data
+          double NM = 2.0;
           if (k == 0) {
             if (j == 0) {
-              if ((i != 0) && (i != NX/2)) grid_cor *= 0.5;
+              if ((i != 0) && (i != NX/2)) NM = 1.0;
             } else {
-              if (i != NX/2) grid_cor *= 0.5;
+              if (i != NX/2) NM = 1.0;
             } 
           }
 
@@ -249,10 +250,10 @@ void compute_power(void) {
           double L2 = 1.5*mu*mu - 0.5;
           double L4 = 4.375*mu*mu*mu*mu - 3.75*mu*mu + 0.375;
           double power = (dkr*dkr+dki*dki)*grid_cor;
-          Pk0[kbin]   += power;
-          Pk2[kbin]   += L2*power;
-          Pk4[kbin]   += L4*power;
-          Nmodes[kbin]++;
+          Pk0[kbin]   += NM*power;
+          Pk2[kbin]   += NM*L2*power;
+          Pk4[kbin]   += NM*L4*power;
+          Nmodes[kbin] += NM;
           if (Output2D) {
             int mubin = (int)(mu*(float)NMU);
             if (mubin >= NMU) mubin = NMU-1;

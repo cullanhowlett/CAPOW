@@ -21,14 +21,14 @@ YMAX      1000.0     % The upper limit of the y-axis
 ZMIN         0.0     % The lower limit of the z-axis
 ZMAX      1000.0     % The upper limit of the z-axis
 LOS            3     % The axis to treat as the line-of-sight (1 = x, 2 = y, 3 = z)        
-InterpOrder    3     % The interpolation order for assigning the particles to the grid (1 = NN, 2 = CIC, 3 = TSC)
-DoInterlacing  1     % Whether or not to using interlacing to reduce aliasing (1 = Yes, 0 = No)
+InterpOrder    1     % The interpolation order for assigning the particles to the grid (1 = NN, 2 = CIC, 3 = TSC)
+DoInterlacing  0     % Whether or not to using interlacing to reduce aliasing (1 = Yes, 0 = No)
 
 % Output Specifications
 % =====================
-NK         300       % The number of k-bins to output in
+NK         1610       % The number of k-bins to output in
 NMU        120       % The number of mu-bins to output in (only used if Output2D = 1)
 Mink       0.0       % The minimum value of k to output. If OutputLog = 1 this should be logged (i.e., -3 for a minimum k value of 0.001)
-Maxk       1.88495559215       % The maximum value of k to output. If OutputLog = 1 this should be logged (i.e.,  0 for a maximum k value of 1.0)
+Maxk       1.610       % The maximum value of k to output. If OutputLog = 1 this should be logged (i.e.,  0 for a maximum k value of 1.0)
 Output2D     1       % Whether or not to output the power spectra in separate mu-bins in addition to the multipoles (1 = Yes, 0 = No)
 OutputLog    0       % Whether or not to output the power spectra log-spaced k bins instead of linear (1 = Yes, 0 = No)
