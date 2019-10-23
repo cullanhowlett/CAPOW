@@ -75,7 +75,7 @@ ifeq ($(MACHINE),LAPTOP)
 endif
 
 ifeq ($(MACHINE),CORI)
-  CC = cc -openmp
+  CC = cc
   FFTW_INCL = -I/opt/cray/pe/fftw/3.3.8.2/mic_knl/include/
   FFTW_LIBS = -L/opt/cray/pe/fftw/3.3.8.2/mic_knl/lib/ -lfftw3_mpi -lfftw3
   GSL_INCL  = -I/global/common/sw/cray/cnl7/haswell/gsl/2.5/intel/19.0.3.199/7twqxxq/include/

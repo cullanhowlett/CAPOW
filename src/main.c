@@ -259,8 +259,8 @@ void compute_power(void) {
             if (mubin >= NMU) mubin = NMU-1;
             int bin = kbin*NMU + mubin;
             if ((bin >= 0) && (bin < NK*NMU)) {
-              Pk_2D[bin]    += power;
-              Nmodes_2D[bin]++;
+              Pk_2D[bin]    += NM*power;
+              Nmodes_2D[bin] += NM;
             }
           }
         } 
