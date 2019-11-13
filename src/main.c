@@ -898,6 +898,8 @@ void create_grids(void) {
     } while(Local_nx_table[RightTask] == 0);
   }
 
+  printf("Reserving memory...\n"); 
+
   // Allocate the grids and create the FFTW plan
   ddg = (double*)calloc(Total_size,sizeof(double));
   if (Periodic) {
@@ -918,6 +920,8 @@ void create_grids(void) {
       plan_interlace_2 = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_interlace_2,(fftw_complex*)ddg_interlace_2,MPI_COMM_WORLD,FFTW_ESTIMATE);   
     }
   }
+
+  printf("Creating redshift-distance lookup table...\n"); 
 
   // Generate a redshift-distance lookup table if necessary
   int nbins = 10000;
