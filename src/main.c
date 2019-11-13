@@ -62,60 +62,122 @@ int main(int argc, char **argv) {
 
   if (ThisTask == 0) {
     printf("\nReading input data and assigning to grid\n"); 
-    printf("========================================");
+    printf("========================================\n");
     fflush(stdout);
   }
-  double NGRID = read_data_serial_ascii();
+  unsigned long long NDATA, NRAND;
+  if (Periodic) {
+    NDATA = read_periodic_serial_ascii();
+  } else if (Survey) {
+    char datafile[2000], randfile[2000];
+    REDMIN = 1.0e30, REDMAX = -1.0e30;
+    if(!(data = (struct survey_data *) malloc(NOBJ_Max*sizeof(struct survey_data)))) { printf("Task %d unable to allocate memory for data\n", ThisTask);  FatalError("main", 72); }
+    if(!(randoms = (struct survey_data *) malloc(NOBJ_Max*sizeof(struct survey_data)))) { printf("Task %d unable to allocate memory for randoms\n", ThisTask);  FatalError("main", 72); }
+    sprintf(datafile, "%s/%s", InputDir, FileBase);
+    sprintf(randfile, "%s/%s", InputDir, RandFileBase);
+    NDATA = read_survey_serial_ascii(datafile, data);
+    NRAND = read_survey_serial_ascii(randfile, randoms);
+    if (NBAR_Column < 0) compute_nbar(0, NDATA, NRAND);
+    if (FKP_Column < 0) {
+      printf("Computing FKP Weights...\n");
+      compute_fkp(NDATA, data);
+      compute_fkp(NRAND, randoms);
+    }
+    assign_survey_data(NDATA, data, 1.0);
+  }
 
   if (ThisTask == 0) {
-    printf("\nComputing shot-noise, normalisation and preparing for FFT\n"); 
-    printf("=========================================================\n");
+    printf("\nComputing shot-noise and normalisation\n"); 
+    printf("======================================\n");
     fflush(stdout);
   }
 
   // Sum over all processors to get the global quantities
   // needed for the mean density, shot-noise and normalisation
-  double NGRID_TOT = 0;
-  MPI_Allreduce(&NGRID, &NGRID_TOT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  double mean  = NGRID_TOT/((double)NX*(double)NY*(double)NZ);
-  double nbar  = NGRID_TOT/((XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN));
-  double shot  = NGRID_TOT;
-  double norm  = nbar*NGRID_TOT;
-  if (ThisTask == 0) {
-    printf("mean          = %g\n",mean);
-    printf("nbar          = %g\n",nbar);
-    printf("shot-noise    = %g\n",shot);
-    printf("normalisation = %g\n",norm);
-    fflush(stdout);
-  }
+  double alpha, shot, norm;
+  if (Periodic) {
+    double NDATA_TOT = 0;
+    MPI_Allreduce(&NDATA, &NDATA_TOT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    alpha  = NDATA_TOT/((double)NX*(double)NY*(double)NZ);
+    double nbar  = NDATA_TOT/((XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN));
+    double shot  = NDATA_TOT;
+    double norm  = nbar*NDATA_TOT;
+    if (ThisTask == 0) {
+      printf("mean          = %g\n",alpha);
+      printf("nbar          = %g\n",nbar);
+      printf("shot-noise    = %g\n",shot);
+      printf("normalisation = %g\n",norm);
+      fflush(stdout);
+    }
+  } else if (Survey) {
+    double data_nbw = 0.0, data_nbwsq = 0.0, data_nbsqwsq = 0.0; 
+    double rand_nbw = 0.0, rand_nbwsq = 0.0, rand_nbsqwsq = 0.0;
+    for (unsigned long long i=0;i<NDATA;i++) {
+      data_nbw     += data[i].weight;
+      data_nbwsq   += data[i].weight*data[i].weight;
+      data_nbsqwsq += data[i].weight*data[i].weight*data[i].nbar;
+    }
+    for (unsigned long long i=0;i<NRAND;i++) {
+      rand_nbw     += randoms[i].weight;
+      rand_nbwsq   += randoms[i].weight*randoms[i].weight;
+      rand_nbsqwsq += randoms[i].weight*randoms[i].weight*randoms[i].nbar;
+    }
 
-  // Subtract the mean density
-  int i, j, k;
-  //#pragma omp parallel for private(i,j,k) collapse(3)
-  for (i=0; i<Local_nx; i++) {
-    for (j=0; j<NY; j++) {
-      for (k=0; k<NZ; k++) {
-        unsigned long long ind = k+2*(NZ/2+1)*(j+NY*i);
-        ddg[ind] -= mean;
-        if (DoInterlacing) ddg_2[ind] -= mean;
-      }
+    alpha = data_nbw/rand_nbw;
+    rand_nbwsq   *= alpha*alpha;
+    rand_nbsqwsq *= alpha;
+
+    shot = data_nbwsq + rand_nbwsq;
+    norm = rand_nbsqwsq;
+
+    if (ThisTask == 0) {
+      printf("alpha = %g\n",alpha);
+      printf("shot-noise [data, randoms]    = %g, %g\n",data_nbwsq, rand_nbwsq);
+      printf("normalisation [data, randoms] = %g, %g\n",data_nbsqwsq, rand_nbsqwsq);
+      fflush(stdout);
     }
   }
 
   if (ThisTask == 0) {
-    printf("\nFourier transforming overdensity field\n"); 
-    printf("======================================\n");
+    printf("\nSubtracting off expected density\n"); 
+    printf("================================\n");
     fflush(stdout);
   }
-  fftw_execute(plan);
-  if (DoInterlacing) fftw_execute(plan_2);
+  if (Periodic) {
+    // Subtract the mean density off of each cell
+    int i, j, k;
+    for (i=0; i<Local_nx; i++) {
+      for (j=0; j<NY; j++) {
+        for (k=0; k<NZ; k++) {
+          unsigned long long ind = k+2*(NZ/2+1)*(j+NY*i);
+          ddg[ind] -= alpha;
+          if (DoInterlacing) ddg_interlace[ind] -= alpha;
+        }
+      }
+    }
+  } else if (Survey) {
+    // Subtract the random counts
+    assign_survey_data(NRAND, randoms, -alpha);
+  }
 
-  if (ThisTask == 0) {
-    printf("\nIterating over grid cells\n"); 
-    printf("=========================\n");
-    fflush(stdout);
+  if (Periodic) {
+    if (ThisTask == 0) {
+      printf("\nFourier transforming overdensity field\n"); 
+      printf("======================================\n");
+      fflush(stdout);
+    }
+    fftw_execute(plan);
+    if (DoInterlacing) fftw_execute(plan_interlace);
+
+    if (ThisTask == 0) {
+      printf("\nIterating over grid cells\n"); 
+      printf("=========================\n");
+      fflush(stdout);
+    }
+    compute_periodic_power();
+  } else if (Survey) {
+    compute_survey_power();
   }
-  compute_power();
 
   if (ThisTask == 0) {
     printf("\nOutputting power spectra\n"); 
@@ -134,9 +196,9 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-// Compute the power spectrum from the Fourier transformed overdensity
-// ===================================================================
-void compute_power(void) {
+// Compute the power spectrum from the Fourier transformed overdensity for a periodic simulation
+// =============================================================================================
+void compute_periodic_power(void) {
 
   // Set up the bins for P(k) data 
   binwidth=(Maxk-Mink)/(double)NK; // bin width
@@ -229,10 +291,10 @@ void compute_power(void) {
             double kh = ax+ay+az;
             double sink = sin(kh);
             double cosk = cos(kh);
-            double dkr_2 = ddg_2[(2*k  )+2*(NZ/2+1)*(j+NY*(i-Local_x_start))];
-            double dki_2 = ddg_2[(2*k+1)+2*(NZ/2+1)*(j+NY*(i-Local_x_start))]; 
-            dkr += dkr_2*cosk - dki_2*sink;
-            dki += dkr_2*sink + dki_2*cosk;
+            double dkr_interlace = ddg_interlace[(2*k  )+2*(NZ/2+1)*(j+NY*(i-Local_x_start))];
+            double dki_interlace = ddg_interlace[(2*k+1)+2*(NZ/2+1)*(j+NY*(i-Local_x_start))]; 
+            dkr += dkr_interlace*cosk - dki_interlace*sink;
+            dki += dkr_interlace*sink + dki_interlace*cosk;
           }
  
           // This is necessary because we are only looping over half the grid in the z axis
@@ -271,18 +333,395 @@ void compute_power(void) {
   return;
 }
 
+// Compute the power spectrum from the Fourier transformed overdensity for a survey
+// ===============================================================================
+void compute_survey_power(void) {
+
+  // Set up the bins for P(k) data 
+  binwidth=(Maxk-Mink)/(double)NK; // bin width
+  if (Output2D) { 
+    Pk_2D     = (double*)calloc(NK*NMU, sizeof(double));
+    Nmodes_2D = (int*)calloc(NK*NMU, sizeof(int));
+  }
+  Pk0 = (double*)calloc(NK, sizeof(double));       // binned power spectrum
+  Pk2 = (double*)calloc(NK, sizeof(double));       // binned power spectrum
+  Pk4 = (double*)calloc(NK, sizeof(double));       // binned power spectrum
+  if (Odd_Multipoles) {
+    Pk1 = (double*)calloc(NK, sizeof(double));       // binned power spectrum
+    Pk3 = (double*)calloc(NK, sizeof(double));       // binned power spectrum
+  }
+  Nmodes = (int*)calloc(NK, sizeof(int));        // number of modes in each bin
+
+  // Loop over the multipoles
+  int multipole_counter = 2;
+  if (Odd_Multipoles) multipole_counter = 1;
+  for (int multipole=0; multipole<=4; multipole+=multipole_counter) {
+
+    // For the monopole, we only need to take the Fourier transform
+    // and loop over the grid
+    if (multipole == 0) {
+      if (ThisTask == 0) {
+        printf("\nFourier transforming monopole overdensity field\n"); 
+        printf("===============================================\n");
+        fflush(stdout);
+      }
+      fftw_execute(plan);
+      if (DoInterlacing) fftw_execute(plan_interlace);
+      assign_survey_power(0, 0, 0, 0);
+    }
+
+    // For the higher order multipoles, we need to loop over directions of the 
+    // unit vectors, multiply the density grid, do the Fourier transform and loop over grid cells
+
+    // Dipole
+    if (multipole == 1) {
+      if (ThisTask == 0) {
+        printf("\nFourier transforming dipole overdensity field\n"); 
+        printf("=================================================\n");
+        fflush(stdout);
+      }
+
+      for (int ii=0; ii<3; ii++) {
+        if (ThisTask == 0) {
+          printf("Indices: %d\n", ii); 
+          fflush(stdout);
+        }
+
+        // Multiply the density grid by the real space unit vectors
+        for (int ix=0; ix<Local_nx; ix++) {
+          for (int iy=0; iy<NY; iy++) {
+            for (int iz=0; iz<NZ; iz++) {
+              long ind = iz+2*(NZ/2+1)*(iy+NY*ix);
+              double vec[3] = {(ix+Local_x_start)*dx+XMIN-X_Origin, iy*dy+YMIN-Y_Origin, iz*dz+ZMIN-Z_Origin};
+              double r2 = vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2];
+              if (r2 == 0.0) r2 = 1.0;
+              ddg_2[ind] = ddg[ind]*vec[ii]/sqrt(r2);
+              if (DoInterlacing) ddg_interlace_2[ind] = ddg_interlace[ind]*vec[ii]/sqrt(r2);
+            }
+          }
+        }
+
+        fftw_execute(plan_2);
+        if (DoInterlacing) fftw_execute(plan_interlace_2);
+        assign_survey_power(1, ii, 0, 0);
+      }
+    }
+
+    // Quadrupole
+    if (multipole == 2) {
+      if (ThisTask == 0) {
+        printf("\nFourier transforming quadrupole overdensity field\n"); 
+        printf("=================================================\n");
+        fflush(stdout);
+      }
+
+      for (int ii=0; ii<3; ii++) {
+        for (int jj=ii; jj<3; jj++) {
+          if (ThisTask == 0) {
+            printf("Indices: %d %d\n", ii, jj); 
+            fflush(stdout);
+          }
+
+          // Multiply the density grid by the real space unit vectors
+          for (int ix=0; ix<Local_nx; ix++) {
+            for (int iy=0; iy<NY; iy++) {
+              for (int iz=0; iz<NZ; iz++) {
+                long ind = iz+2*(NZ/2+1)*(iy+NY*ix);
+                double vec[3] = {(ix+Local_x_start)*dx+XMIN-X_Origin, iy*dy+YMIN-Y_Origin, iz*dz+ZMIN-Z_Origin};
+                double r2 = vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2];
+                if (r2 == 0.0) r2 = 1.0;
+                ddg_2[ind] = ddg[ind]*vec[ii]*vec[jj]/r2;
+                if (DoInterlacing) ddg_interlace_2[ind] = ddg_interlace[ind]*vec[ii]*vec[jj]/r2;
+              }
+            }
+          }
+
+          fftw_execute(plan_2);
+          if (DoInterlacing) fftw_execute(plan_interlace_2);
+          assign_survey_power(2, ii, jj, 0);
+        }
+      }
+    }
+
+    // Octopole
+    if (multipole == 3) {
+      if (ThisTask == 0) {
+        printf("\nFourier transforming octopole overdensity field\n"); 
+        printf("=================================================\n");
+        fflush(stdout);
+      }
+
+      for (int ii=0; ii<3; ii++) {
+        int jjlow=ii, jjhigh=ii+1;
+        if (ii == 0) jjhigh = ii+2;
+        for (int jj=jjlow; jj<jjhigh; jj++) {
+          int kklow=0, kkhigh=3;
+          if (jj != ii) kklow = 2;
+          for (int kk=kklow; kk<kkhigh; kk++) {
+            if (ThisTask == 0) {
+              printf("Indices: %d %d %d\n", ii, jj, kk); 
+              fflush(stdout);
+            }
+
+            // Multiply the density grid by the real space unit vectors
+            for (int ix=0; ix<Local_nx; ix++) {
+              for (int iy=0; iy<NY; iy++) {
+                for (int iz=0; iz<NZ; iz++) {
+                  long ind = iz+2*(NZ/2+1)*(iy+NY*ix);
+                  double vec[3] = {(ix+Local_x_start)*dx+XMIN-X_Origin, iy*dy+YMIN-Y_Origin, iz*dz+ZMIN-Z_Origin};
+                  double r2 = vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2];
+                  if (r2 == 0.0) r2 = 1.0;
+                  ddg_2[ind] = ddg[ind]*vec[ii]*vec[jj]*vec[kk]/(r2*sqrt(r2));
+                  if (DoInterlacing) ddg_interlace_2[ind] = ddg_interlace[ind]*vec[ii]*vec[jj]*vec[kk]/(r2*sqrt(r2));
+                }
+              }
+            }
+
+            fftw_execute(plan_2);
+            if (DoInterlacing) fftw_execute(plan_interlace_2);
+            assign_survey_power(3, ii, jj, kk);
+          }
+        }
+      }
+    }
+
+    // Hexadecapole
+    if (multipole == 4) {
+      if (ThisTask == 0) {
+        printf("\nFourier transforming hexadecapole overdensity field\n"); 
+        printf("===================================================\n");
+        fflush(stdout);
+      }
+
+
+      for (int ii=0; ii<3; ii++) {
+        for (int jj=0; jj<3; jj++) {
+          int kklow=0, kkhigh=3;
+          if (jj != ii) {
+            if (ii == 1) {
+              kklow = 2;
+            } else if (ii == 2) {
+              if (jj == 1) {
+                continue;
+              } else {
+                kklow = 1;
+                kkhigh = 2;
+              } 
+            } else {
+              kklow = jj;
+            }
+          }
+          for (int kk=kklow; kk<kkhigh; kk++) {
+            if (ThisTask == 0) {
+              printf("Indices: %d %d %d\n", ii, jj, kk); 
+              fflush(stdout);
+            }
+
+            // Multiply the density grid by the real space unit vectors
+            for (int ix=0; ix<Local_nx; ix++) {
+              for (int iy=0; iy<NY; iy++) {
+                for (int iz=0; iz<NZ; iz++) {
+                  long ind = iz+2*(NZ/2+1)*(iy+NY*ix);
+                  double vec[3] = {(ix+Local_x_start)*dx+XMIN-X_Origin, (iy)*dy+YMIN-Y_Origin, (iz)*dz+ZMIN-Z_Origin};
+                  double r2 = vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2];
+                  if (r2 == 0.0) r2 = 1.0;
+                  ddg_2[ind] = ddg[ind]*vec[ii]*vec[ii]*vec[jj]*vec[kk]/(r2*r2);
+                  if (DoInterlacing) ddg_interlace_2[ind] = ddg_interlace[ind]*vec[ii]*vec[ii]*vec[jj]*vec[kk]/(r2*r2);
+                }
+              }
+            }
+
+            fftw_execute(plan_2);
+            if (DoInterlacing) fftw_execute(plan_interlace_2);
+            assign_survey_power(4, ii, jj, kk);
+          }
+        }
+      }
+    } 
+  }
+
+  return;
+}
+
+// Loop over the grid, compute the correct power and assign to the
+// relevant multipole bin based on the multipole we are interested in.
+// ====================================================================
+void assign_survey_power(int multipole, int ii, int jj, int kk) {
+
+  // calculate Nyquist frequency
+  double ny_x = (M_PI/dx);
+  double ny_y = (M_PI/dy);
+  double ny_z = (M_PI/dz);
+  double min_nyquist=ny_x;
+  if (ny_y<min_nyquist) min_nyquist=ny_y;
+  if (ny_z<min_nyquist) min_nyquist=ny_z;
+
+  // Loop over all cells on this processor.
+  int i, j, k;
+  double sx = 1.0/((float)NX*dx), sy = 1.0/((float)NY*dy), sz = 1.0/((float)NZ*dz);
+  for (i=Local_x_start; i<Local_x_start+Local_nx; i++) {
+    for (j=0; j<NY; j++) {
+      for (k=0; k<=NZ/2; k++) {
+  
+        // frequency in x
+        double fx;
+        if (i <= NX/2) { 
+          fx = (float)i*sx;
+        } else {
+          fx = ((float)i-(float)NX)*sx;
+        }
+
+        // frequency in y
+        double fy;
+        if (j <= NY/2) {
+          fy = (float)j*sy;
+        } else {
+          fy = ((float)j-(float)NY)*sy;
+        }
+
+        // frequency in z
+        double fz = (float)k*sz;
+  
+        // length of k vector, value of mu and bin
+        double fktot=2.0*M_PI*sqrt(fx*fx+fy*fy+fz*fz);
+        int kbin;
+        if (OutputLog) {
+          kbin = (int)((float)(log10(fktot)-Mink)/binwidth);
+        } else {
+          kbin = (int)((float)(fktot-Mink)/binwidth);
+        }
+
+        if ((kbin >= 0) && (kbin < NK) && (fktot <= min_nyquist)) {
+    
+          // set up correction for gridding - in effect we're
+          // convolving the density field with a top-hat function in
+          // each direction, so we're multiplying each Fourier mode by
+          // a sinc function. To correct this, we therefore divide by
+          // the sinc functions.
+          double sinc_x = 1.0, sinc_y=1.0, sinc_z=1.0;
+          double ax = M_PI*fx*dx;
+          double ay = M_PI*fy*dy;
+          double az = M_PI*fz*dz;
+          if (fx != 0.0) sinc_x = sin(ax)/ax;
+          if (fy != 0.0) sinc_y = sin(ay)/ay;
+          if (fz != 0.0) sinc_z = sin(az)/az;
+          double grid_cor = pow(1.0/(sinc_x*sinc_y*sinc_z), 2*InterpOrder);
+
+          // Compute the power
+          double power;
+          double kvec[3] = {2.*M_PI*fx, 2.*M_PI*fy, 2.*M_PI*fz};
+          long long ind = (2*k)+2*(NZ/2+1)*(j+NY*(i-Local_x_start));
+          double dkr = ddg_2[ind];
+          double dki = ddg_2[ind+1]; 
+          if (DoInterlacing) {
+            grid_cor *= 0.25;
+            double kh = ax+ay+az;
+            double sink = sin(kh);
+            double cosk = cos(kh);
+            double dkr_interlace = ddg_interlace_2[ind];
+            double dki_interlace = ddg_interlace_2[ind+1]; 
+            dkr += dkr_interlace*cosk - dki_interlace*sink;
+            dki += dkr_interlace*sink + dki_interlace*cosk;
+          }
+          if (multipole == 0) {
+            F0[ind] = dkr;
+            F0[ind+1] = dki;
+            power = (dkr*dkr+dki*dki)*grid_cor;
+          } else if (multipole % 2) {
+            power = (dkr*F0[ind+1]-dki*F0[ind])*grid_cor;
+          } else {
+            power = (dkr*F0[ind]+dki*F0[ind+1])*grid_cor;
+          }
+
+          // This is necessary because we are only looping over half the grid in the z axis
+          // so we need to fully account for the assumed hermitian symmetry in the data
+          int NM = 2;
+          if (k == 0) {
+            if (j == 0) {
+              if ((i != 0) && (i != NX/2)) NM = 1;
+            } else {
+              if (i != NX/2) NM = 1;
+            } 
+          }
+
+          // Add the power to the bin
+          power *= NM;
+          if (multipole == 0) {
+            Pk0[kbin] += power;
+            Pk2[kbin] -= 0.5*power;
+            Pk4[kbin] += 0.375*power;
+            Nmodes[kbin] += NM;
+          }
+          if (multipole == 1) {
+            if (fktot > 0.0) {
+              power *= kvec[ii]/fktot;
+              Pk1[kbin] += power;
+              Pk3[kbin] -= 1.5*power;
+            }
+          }
+          if (multipole == 2) {
+            if (fktot > 0.0) {
+              double kprefac = 1.0;
+              if (ii != jj) {
+                kprefac = 2.0;
+              }
+              power *= kprefac*kvec[ii]*kvec[jj]/(fktot*fktot);
+              Pk2[kbin] += 1.5*power;
+              Pk4[kbin] -= 3.75*power;
+            }
+          }
+          if (multipole == 3) {
+            if (fktot > 0.0) {
+              double kprefac = 1.0;
+              if (ii != kk) {
+                if (ii != jj) {
+                  kprefac = 6.0;
+                } else {
+                  kprefac = 3.0;
+                }
+              }
+              Pk3[kbin] += 2.5*kprefac*kvec[ii]*kvec[jj]*kvec[kk]/(fktot*fktot*fktot)*power;
+            }
+          }
+          if (multipole == 4) {
+            if (fktot > 0) {
+              double kprefac = 1.0;
+              if (ii == jj) {
+                if (ii != kk) kprefac = 4.0;
+              } else {
+                if (jj == kk) {
+                  kprefac = 6.0;
+                } else {
+                  kprefac = 12.0;
+                }
+              }
+              Pk4[kbin] += 4.375*kprefac*kvec[ii]*kvec[ii]*kvec[jj]*kvec[kk]/(fktot*fktot*fktot*fktot)*power;
+            }
+          }
+        } 
+      }
+    } 
+  }
+
+  return;
+}
+
 // Output the power spectrum
 // =========================
 void output_power(double shot, double norm) {
 
   // Sum the power and number of modes over all processors.
   int * Nmodes_glob, * Nmodes_2D_glob;
-  double * Pk0_glob, * Pk2_glob, * Pk4_glob, * Pk_2D_glob;
+  double * Pk0_glob, * Pk1_glob, * Pk2_glob, * Pk3_glob, * Pk4_glob, * Pk_2D_glob;
   if (ThisTask == 0) {
     Pk0_glob = (double*)calloc(NK, sizeof(double));
     Pk2_glob = (double*)calloc(NK, sizeof(double));
     Pk4_glob = (double*)calloc(NK, sizeof(double));
     Nmodes_glob = (int*)calloc(NK, sizeof(int));
+    if (Odd_Multipoles) {
+      Pk1_glob = (double*)calloc(NK, sizeof(double));
+      Pk3_glob = (double*)calloc(NK, sizeof(double));
+    }
     if (Output2D) {
       Pk_2D_glob = (double*)calloc(NK*NMU, sizeof(double));
       Nmodes_2D_glob = (int*)calloc(NK*NMU, sizeof(int));
@@ -292,6 +731,10 @@ void output_power(double shot, double norm) {
   MPI_Reduce(Pk2, Pk2_glob, NK, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   MPI_Reduce(Pk4, Pk4_glob, NK, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   MPI_Reduce(Nmodes, Nmodes_glob, NK, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+  if (Odd_Multipoles) {
+    MPI_Reduce(Pk1, Pk1_glob, NK, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Reduce(Pk3, Pk3_glob, NK, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD); 
+  }
   if (Output2D) {
     MPI_Reduce(Pk_2D, Pk_2D_glob, NK*NMU, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
     MPI_Reduce(Nmodes_2D, Nmodes_2D_glob, NK*NMU, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -323,6 +766,10 @@ void output_power(double shot, double norm) {
         Pk0_glob[i] /= Nmodes_glob[i]*norm; 
         Pk2_glob[i] *= 5.0/(Nmodes_glob[i]*norm);
         Pk4_glob[i] *= 9.0/(Nmodes_glob[i]*norm);
+        if (Odd_Multipoles) {
+          Pk1_glob[i] *= 3.0/(Nmodes_glob[i]*norm);
+          Pk3_glob[i] *= 7.0/(Nmodes_glob[i]*norm);
+        }
         Pkfill[i] = 1;
       }
     }
@@ -345,13 +792,18 @@ void output_power(double shot, double norm) {
         }
         printf("Last full bin: %d (k=%g)\n",i, kmax);
         fflush(stdout);
+        if (Odd_Multipoles) { Pk1_glob[i]=0.0; Pk3_glob[i]=0.0; }
         Pkfill[i]=0; Pk0_glob[i]=0.0; Pk2_glob[i]=0.0; Pk4_glob[i]=0.0; Nmodes_glob[i]=0.0; break;
       }
     }   
    
     // Output the power spectrum values
     // You may want to change this based on your choice of output format
-    fprintf(fout, "# k, pk0, pk2, pk4, Nmodes\n");
+    if (Odd_Multipoles) {
+      fprintf(fout, "# k, pk0, pk1, pk2, pk3, pk4, Nmodes\n");
+    } else {
+      fprintf(fout, "# k, pk0, pk2, pk4, Nmodes\n");
+    }
     for(int i=0;i<NK;i++) {
       double kp;
       if (OutputLog) {
@@ -359,7 +811,11 @@ void output_power(double shot, double norm) {
       } else {
         kp = Mink+((float)i+0.5)*binwidth;
       }
-      fprintf(fout,"%g %g %g %g %d\n",kp,Pk0_glob[i],Pk2_glob[i],Pk4_glob[i],Nmodes_glob[i]);
+      if (Odd_Multipoles) {
+        fprintf(fout,"%g %g %g %g %g %g %d\n",kp,Pk0_glob[i],Pk1_glob[i],Pk2_glob[i],Pk3_glob[i],Pk4_glob[i],Nmodes_glob[i]);
+      } else {
+        fprintf(fout,"%g %g %g %g %d\n",kp,Pk0_glob[i],Pk2_glob[i],Pk4_glob[i],Nmodes_glob[i]);
+      }
     }
     fclose(fout);
    
@@ -385,6 +841,10 @@ void output_power(double shot, double norm) {
     free(Pk4_glob);
     free(Pkfill);
     free(Nmodes_glob);
+    if (Odd_Multipoles) {
+      free(Pk1_glob);
+      free(Pk3_glob);
+    }
     if (Output2D) {
       free(Pk_2D_glob);
       free(Nmodes_2D_glob);
@@ -420,23 +880,61 @@ void create_grids(void) {
     LeftTask = ThisTask;
     do {
       LeftTask--;
-      if(LeftTask < 0) LeftTask = NTask - 1;
+      if (Periodic) {
+        if(LeftTask < 0) LeftTask = NTask - 1;
+      } else if (Survey) {
+        if(LeftTask < 0) LeftTask = MPI_PROC_NULL;
+      }
     } while(Local_nx_table[LeftTask] == 0);
       
     RightTask = ThisTask;
     do {
       RightTask++;
-      if(RightTask >= NTask) RightTask = 0;
+      if (Periodic) {
+        if(RightTask >= NTask) RightTask = 0;
+      } else if (Survey) {
+        if(RightTask >= NTask) RightTask = MPI_PROC_NULL;
+      }
     } while(Local_nx_table[RightTask] == 0);
   }
 
   // Allocate the grids and create the FFTW plan
   ddg = (double*)calloc(Total_size,sizeof(double));
-  plan = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg,(fftw_complex*)ddg,MPI_COMM_WORLD,FFTW_ESTIMATE); 
-  if (DoInterlacing) {
+  if (Periodic) {
+    plan = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg,(fftw_complex*)ddg,MPI_COMM_WORLD,FFTW_ESTIMATE); 
+  } else if (Survey) {
     ddg_2 = (double*)calloc(Total_size,sizeof(double));
-    plan_2 = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_2,(fftw_complex*)ddg_2,MPI_COMM_WORLD,FFTW_ESTIMATE);   
+    plan = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg,(fftw_complex*)ddg_2,MPI_COMM_WORLD,FFTW_ESTIMATE); 
+    plan_2 = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_2,(fftw_complex*)ddg_2,MPI_COMM_WORLD,FFTW_ESTIMATE); 
+    F0 = (double*)malloc(Total_size*sizeof(double));
   }
+  if (DoInterlacing) {
+    ddg_interlace = (double*)calloc(Total_size,sizeof(double));
+    if (Periodic) {
+      plan_interlace = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_interlace,(fftw_complex*)ddg_interlace,MPI_COMM_WORLD,FFTW_ESTIMATE);   
+    } else if (Survey) {
+      ddg_interlace_2 = (double*)calloc(Total_size,sizeof(double));
+      plan_interlace = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_interlace,(fftw_complex*)ddg_interlace_2,MPI_COMM_WORLD,FFTW_ESTIMATE);   
+      plan_interlace_2 = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_interlace_2,(fftw_complex*)ddg_interlace_2,MPI_COMM_WORLD,FFTW_ESTIMATE);   
+    }
+  }
+
+  // Generate a redshift-distance lookup table if necessary
+  int nbins = 10000;
+  REDMIN =  0.0;
+  REDMAX = 10.0;
+  double redbinwidth = (REDMAX-REDMIN)/(double)(nbins-1);
+  double * ztemp = (double *)malloc(nbins*sizeof(double));
+  double * rtemp = (double *)malloc(nbins*sizeof(double));
+  ztemp[0] = 0.0, rtemp[0] = 0.0;
+  for (int i=1;i<nbins;i++) {
+      ztemp[i] = i*redbinwidth+REDMIN;
+      rtemp[i] = comoving_distance(ztemp[i]);
+  }
+  red_acc = gsl_interp_accel_alloc(), dist_acc = gsl_interp_accel_alloc();
+  red_spline = gsl_spline_alloc(gsl_interp_cspline, nbins), dist_spline = gsl_spline_alloc(gsl_interp_cspline, nbins);
+  gsl_spline_init(red_spline, rtemp, ztemp, nbins), gsl_spline_init(dist_spline, ztemp, rtemp, nbins);
+  free(rtemp), free(ztemp);
 
   return;
 }
@@ -446,9 +944,18 @@ void create_grids(void) {
 void destroy_grids(void) {
   fftw_destroy_plan(plan);
   free(ddg);
-  if (DoInterlacing) {
+  if (Survey) {
     fftw_destroy_plan(plan_2);
     free(ddg_2);
+    free(F0);
+  }
+  if (DoInterlacing) {
+    fftw_destroy_plan(plan_interlace);
+    free(ddg_interlace);
+    if (Survey) {
+      fftw_destroy_plan(plan_interlace_2);
+      free(ddg_interlace_2);
+    }
   }
   free(Pk0);
   free(Pk2);

@@ -58,6 +58,10 @@ void read_parameterfile(char * fname) {
   addr[nt] = FileBase;
   id[nt++] = STRING;
 
+  strcpy(tag[nt], "RandFileBase");
+  addr[nt] = RandFileBase;
+  id[nt++] = STRING;
+
   strcpy(tag[nt], "NumFilesInParallel");
   addr[nt] = &NumFilesInParallel;
   id[nt++] = INT;
@@ -98,10 +102,6 @@ void read_parameterfile(char * fname) {
   addr[nt] = &ZMAX;
   id[nt++] = FLOAT;
 
-  strcpy(tag[nt], "LOS");
-  addr[nt] = &LOS;
-  id[nt++] = INT;
-
   strcpy(tag[nt], "DoInterlacing");
   addr[nt] = &DoInterlacing;
   id[nt++] = INT;
@@ -133,6 +133,74 @@ void read_parameterfile(char * fname) {
   strcpy(tag[nt], "Maxk");
   addr[nt] = &Maxk;
   id[nt++] = FLOAT;
+
+  strcpy(tag[nt], "Omega_m");
+  addr[nt] = &Omega_m;
+  id[nt++] = FLOAT;
+
+  strcpy(tag[nt], "Periodic");
+  addr[nt] = &Periodic;
+  id[nt++] = INT;
+
+  strcpy(tag[nt], "LOS");
+  addr[nt] = &LOS;
+  id[nt++] = INT;
+
+  strcpy(tag[nt], "Survey");
+  addr[nt] = &Survey;
+  id[nt++] = INT;
+
+  strcpy(tag[nt], "X_Origin");
+  addr[nt] = &X_Origin;
+  id[nt++] = FLOAT;
+
+  strcpy(tag[nt], "Y_Origin");
+  addr[nt] = &Y_Origin;
+  id[nt++] = FLOAT;
+
+  strcpy(tag[nt], "Z_Origin");
+  addr[nt] = &Z_Origin;
+  id[nt++] = FLOAT;
+
+  strcpy(tag[nt], "NOBJ_Max");
+  addr[nt] = &NOBJ_Max;
+  id[nt++] = INT;
+
+  strcpy(tag[nt], "Coord_Type");
+  addr[nt] = &Coord_Type;
+  id[nt++] = INT;
+
+  strcpy(tag[nt], "x_Column");
+  addr[nt] = &x_Column;
+  id[nt++] = INT;
+
+  strcpy(tag[nt], "y_Column");
+  addr[nt] = &y_Column;
+  id[nt++] = INT;
+
+  strcpy(tag[nt], "z_Column");
+  addr[nt] = &z_Column;
+  id[nt++] = INT;
+
+  strcpy(tag[nt], "NBAR_Column");
+  addr[nt] = &NBAR_Column;
+  id[nt++] = INT;
+
+  strcpy(tag[nt], "SkyArea");
+  addr[nt] = &SkyArea;
+  id[nt++] = FLOAT;
+
+  strcpy(tag[nt], "FKP_Column");
+  addr[nt] = &FKP_Column;
+  id[nt++] = INT;
+
+  strcpy(tag[nt], "FKP_Pk");
+  addr[nt] = &FKP_Pk;
+  id[nt++] = FLOAT;
+
+  strcpy(tag[nt], "Odd_Multipoles");
+  addr[nt] = &Odd_Multipoles;
+  id[nt++] = INT;
 
   if((fd = fopen(fname, "r"))) {
     fflush(stdout);

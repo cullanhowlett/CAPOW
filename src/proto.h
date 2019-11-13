@@ -25,12 +25,20 @@
 // main.c
 void create_grids(void);
 void destroy_grids(void);
-void compute_power(void);
+void compute_survey_power(void);
+void compute_periodic_power(void);
 void output_power(double shot, double norm);
 void FatalError(char * filename, int linenum);
+void assign_survey_power(int multipole, int ii, int jj, int kk);
 
 // read_data.c
-double read_data_serial_ascii(void);
+void compute_nbar(int parallel, unsigned long long NDATA, unsigned long long NRAND);
+void compute_fkp(unsigned long long NOBJ, struct survey_data * inputdata);
+double f(double z, void *p);
+double comoving_distance(double red);
+double read_periodic_serial_ascii(void);
+double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata);
+double assign_survey_data(unsigned long long NOBJ, struct survey_data * inputdata, double prefactor);
 double add_to_grid(double x, double y, double z, double w, double xmin, double xmax, int nx, double * density);
 
 // read_params.c

@@ -4,31 +4,58 @@
 
 % Inputs/Outputs
 % ==============
-InputDir             /Volumes/Work/UQ/DESI/MockChallenge     % Directory containing input files.
-OutputDir            /Volumes/Work/UQ/DESI/MockChallenge/                                  % Directory for output.
-FileBase             UNIT_DESI_Shadab_HOD_snap97_ELG_v0.txt  % Base-filename of output files (appropriate additions are appended at runtime) 
-NumFilesInParallel   1                                       % Limits the number of files that are reading the inputs at once.
+InputDir             /Volumes/Work/UQ/DESI/MockChallenge/Stage2/    % Directory containing input files.
+OutputDir            /Volumes/Work/UQ/DESI/MockChallenge/Stage2/    % Directory for output.
+FileBase             UNIT_lightcone_ELG_NGC_Z_rsd.dat       % Base-filename of files containing the data (appropriate additions are appended at runtime) 
+RandFileBase         UNIT_lightcone_ELG_rand_NGC_Z_rsd.dat  % Base-filename of files containing the randoms (if required, and appropriate additions are appended at runtime) 
+NumFilesInParallel   1                                      % Limits the number of files that are reading the inputs at once.
 
 % Grid Specifications
 % ====================
 NX           512     % The number of grid cells in the x direction.
 NY           512     % The number of grid cells in the y direction.
 NZ           512     % The number of grid cells in the z direction.
-XMIN         0.0     % The lower limit of the x-axis
-XMAX      1000.0     % The upper limit of the x-axis
-YMIN         0.0     % The lower limit of the y-axis
-YMAX      1000.0     % The upper limit of the y-axis
-ZMIN         0.0     % The lower limit of the z-axis
-ZMAX      1000.0     % The upper limit of the z-axis
-LOS            3     % The axis to treat as the line-of-sight (1 = x, 2 = y, 3 = z)        
-InterpOrder    1     % The interpolation order for assigning the particles to the grid (1 = NN, 2 = CIC, 3 = TSC)
+XMIN     -3000.0     % The lower limit of the x-axis
+XMAX      3000.0     % The upper limit of the x-axis
+YMIN     -3000.0     % The lower limit of the y-axis
+YMAX      3000.0     % The upper limit of the y-axis
+ZMIN     -3000.0     % The lower limit of the z-axis
+ZMAX      3000.0     % The upper limit of the z-axis
+InterpOrder    3     % The interpolation order for assigning the particles to the grid (1 = NN, 2 = CIC, 3 = TSC)
 DoInterlacing  0     % Whether or not to using interlacing to reduce aliasing (1 = Yes, 0 = No)
 
 % Output Specifications
 % =====================
-NK         1610       % The number of k-bins to output in
+NK         270       % The number of k-bins to output in
 NMU        120       % The number of mu-bins to output in (only used if Output2D = 1)
 Mink       0.0       % The minimum value of k to output. If OutputLog = 1 this should be logged (i.e., -3 for a minimum k value of 0.001)
-Maxk       1.610       % The maximum value of k to output. If OutputLog = 1 this should be logged (i.e.,  0 for a maximum k value of 1.0)
-Output2D     1       % Whether or not to output the power spectra in separate mu-bins in addition to the multipoles (1 = Yes, 0 = No)
+Maxk       0.270     % The maximum value of k to output. If OutputLog = 1 this should be logged (i.e.,  0 for a maximum k value of 1.0)
+Output2D     0       % Whether or not to output the power spectra in separate mu-bins in addition to the multipoles (1 = Yes, 0 = No)
 OutputLog    0       % Whether or not to output the power spectra log-spaced k bins instead of linear (1 = Yes, 0 = No)
+
+% Cosmology (for converting coordinates, if necessary)
+% =========
+Omega_m    0.3089    % The matter density at the present day
+
+% Parameters for simulation boxes
+% ===============================
+Periodic   0       % Tell the code this is data from a periodic simulation (this or Survey must be set to 1)
+LOS        3       % The axis to treat as the line-of-sight (1 = x, 2 = y, 3 = z)        
+
+% Parameters for survey data
+% ==========================
+Survey         1       % Tell the code this is data from a periodic simulation (this or Periodic must be set to 1)
+X_Origin       0       % The location of the observer in the x-direction
+Y_Origin       0       % The location of the observer in the y-direction
+Z_Origin       0       % The location of the observer in the z-direction
+NOBJ_Max    36026264   % The maximum number of objects to read in (of any single type type, data or randoms, for allocating space)
+Coord_Type     1	   % Are the input coordinates in cartesian coordinates, angular degrees, or angular radians? (0, 1 and otherwise respectively)
+x_Column       1       % The column in the input file containing the x coordinates or RA values (1 is first column)
+y_Column       2       % The column in the input file containing the y coordinates or Dec values (1 is first column)
+z_Column       4       % The column in the input file containing the z coordinates or redshift values (1 is first column)
+NBAR_Column   -1	   % The column in the input file containing the nbar values. Set to -1 to compute these internally using SkyArea value
+SkyArea      10313.24  % The effective solid angle area of the survey in square degrees (if necessary)
+FKP_Column    -1	   % The column in the input file containing the FKP weights. Set to -1 to compute these internally using FKP_Pk value
+FKP_Pk       0.0       % The value to use for computing the FKP weights (if necessary)     
+Odd_Multipoles 1       % Whether or not to compute the odd-order multipoles (1 = Yes, 0 = No)
+
