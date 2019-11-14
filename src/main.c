@@ -886,7 +886,10 @@ void create_grids(void) {
       if (Periodic) {
         if(LeftTask < 0) LeftTask = NTask - 1;
       } else if (Survey) {
-        if(LeftTask < 0) LeftTask = MPI_PROC_NULL;
+        if(LeftTask < 0) {
+          LeftTask = MPI_PROC_NULL;
+          break;
+        }
       }
     } while(Local_nx_table[LeftTask] == 0);
       
@@ -896,7 +899,10 @@ void create_grids(void) {
       if (Periodic) {
         if(RightTask >= NTask) RightTask = 0;
       } else if (Survey) {
-        if(RightTask >= NTask) RightTask = MPI_PROC_NULL;
+        if(RightTask >= NTask) {
+          RightTask = MPI_PROC_NULL;
+          break;
+        }
       }
     } while(Local_nx_table[RightTask] == 0);
   }
