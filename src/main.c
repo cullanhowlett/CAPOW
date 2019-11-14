@@ -870,6 +870,8 @@ void create_grids(void) {
   Local_nxtra = Local_nx+InterpOrder;
   Total_size = 2*alloc_local+InterpOrder*alloc_slice;
 
+  printf("Task %d setting neighbours...\n", ThisTask); 
+
   // Set the neighbouring tasks
   Local_nx_table = (int *)malloc(sizeof(int) * NTask);
   MPI_Allgather(&Local_nx, 1, MPI_INT, Local_nx_table, 1, MPI_INT, MPI_COMM_WORLD);
@@ -898,7 +900,7 @@ void create_grids(void) {
     } while(Local_nx_table[RightTask] == 0);
   }
 
-  printf("Reserving memory...\n"); 
+  printf("Task %d reserving memory...\n", ThisTask); 
 
   // Allocate the grids and create the FFTW plan
   ddg = (double*)calloc(Total_size,sizeof(double));
@@ -921,7 +923,7 @@ void create_grids(void) {
     }
   }
 
-  printf("Creating redshift-distance lookup table...\n"); 
+  printf("Task %d creating redshift-distance lookup table...\n", ThisTask); 
 
   // Generate a redshift-distance lookup table if necessary
   int nbins = 10000;
