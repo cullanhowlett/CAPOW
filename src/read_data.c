@@ -194,7 +194,10 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
     if (tz > ZHI) ZHI = tz;
 
     if (ThisTask == 0) {
-      if ((NREAD % 1000000) == 0) printf("Read %llu objects\n", NREAD);
+      if ((NREAD % 1000000) == 0) {
+        printf("Read %llu objects\n", NREAD);
+        fflush(stdout);
+      }
     }
 
   }

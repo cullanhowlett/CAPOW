@@ -871,7 +871,7 @@ void create_grids(void) {
   Total_size = 2*alloc_local+InterpOrder*alloc_slice;
 
   if (ThisTask == 0) {
-    printf("Task %d setting neighbours...\n", ThisTask); 
+    printf("Setting neighbours...\n"); 
     fflush(stdout);
   }
 
@@ -910,7 +910,7 @@ void create_grids(void) {
   }
 
   if (ThisTask == 0) {
-    printf("Task %d reserving memory...\n", ThisTask); 
+    printf("Reserving memory...\n"); 
     fflush(stdout);
   }
 
@@ -936,7 +936,7 @@ void create_grids(void) {
   }
 
   if (ThisTask == 0) {
-    printf("Task %d creating redshift-distance lookup table...\n", ThisTask); 
+    printf("Creating redshift-distance lookup table...\n"); 
     fflush(stdout);
   }
 
