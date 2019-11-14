@@ -136,7 +136,7 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
     char *bufp = buf;
     int offset;
     double val;
-    double tx, ty, tz, tred, tnbar, tw;
+    /*double tx, ty, tz, tred, tnbar, tw;
     for (int i=1; i<=strlen; i++) {
       sscanf(bufp, "%lf%n", &val, &offset);
       if (i == x_Column) tx = val;
@@ -148,9 +148,9 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
       if (i == NBAR_Column) tnbar = val;
       if (i == FKP_Column) tw = val;
       bufp += offset;
-    }
-    //double tx, ty, tz, tz_rsd, tred, tnbar, tw;
-    //if(sscanf(buf,"%lf %lf %lf %lf\n",&tx,&ty,&tz,&tred)!=4) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+    }*/
+    double tx, ty, tz, tz_rsd, tred, tnbar, tw;
+    if(sscanf(buf,"%lf %lf %lf %lf\n",&tx,&ty,&tz,&tred)!=4) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
 
     // Compute the redshift if we only had cartesian coordinates, otherwise convert to cartesian coordinates
     if (Coord_Type == 0) {
