@@ -284,12 +284,14 @@ void check_inputs(void) {
     }
   }
 
-  if ((LOS != 1) && (LOS != 2) && (LOS != 3)) {
-    if (ThisTask == 0) {
-      printf("\nERROR: `LOS' is neither 1, 2 nor 3.\n");
-      printf("        Please choose a suitable value for `LOS'.\n\n");
+  if (Periodic) {
+    if ((LOS != 1) && (LOS != 2) && (LOS != 3)) {
+      if (ThisTask == 0) {
+        printf("\nERROR: `LOS' is neither 1, 2 nor 3.\n");
+        printf("        Please choose a suitable value for `LOS'.\n\n");
+      }
+      FatalError((char *)"read_param.c", 354);
     }
-    FatalError((char *)"read_param.c", 354);
   }
 
   if ((InterpOrder != 1) && (InterpOrder != 2) && (InterpOrder != 3)) {

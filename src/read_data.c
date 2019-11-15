@@ -236,7 +236,7 @@ double f(double z, void *p) {
 // ==================================================================
 void compute_nbar(int parallel, unsigned long long NDATA, unsigned long long NRAND) {
 
-  printf("Calculating Number Density...\n");
+  if (ThisTask == 0) printf("Calculating Number Density...\n");
 
   int nbins = 200;
   double * znbar = (double *)calloc(nbins+2, sizeof(double));
@@ -319,21 +319,6 @@ double assign_survey_data(unsigned long long NOBJ, struct survey_data * inputdat
   printf("Task %d has %llu objects, gridded %lf\n", ThisTask, NOBJ, NGRID/prefactor);
   fflush(stdout);
 
-  // Copy across the extra slices from the task on the left and add it to the leftmost slices
-  // of the task on the right. Skip over tasks without any slices.
-  if (InterpOrder > 0) {
-    double * temp_ddg = (double *)calloc(InterpOrder*alloc_slice,sizeof(double));
-    ierr = MPI_Sendrecv(&(ddg[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
-                        &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
-    for (int i=0;i<InterpOrder*alloc_slice;i++) ddg[i] += temp_ddg[i];
-    if (DoInterlacing) {
-      ierr = MPI_Sendrecv(&(ddg_interlace[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
-                          &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
-      for (int i=0;i<InterpOrder*alloc_slice;i++) ddg_interlace[i] += temp_ddg[i];
-    }
-    free(temp_ddg);
-  }
-
   return NGRID;
 }
 
@@ -384,7 +369,7 @@ double add_to_grid(double x, double y, double z, double w, double xmin, double x
   } else if (InterpOrder == 2) {
 
     if (ThisTask == NTask-1) {
-      if ((x < xmin) || (x > xmax)) return 0.0;
+      if ((x < xmin) || (x >= xmax)) return 0.0;
     } else { 
       if ((x < xmin) || (x > xmax)) return 0.0;
     }
@@ -417,16 +402,9 @@ double add_to_grid(double x, double y, double z, double w, double xmin, double x
         if (iz >= NZ) iz = NZ-1;
       }
     } else if (Survey) {
-      if (ThisTask == NTask-1) {
-        if(ixneigh == nx) {
-          ixneigh = nx-1;
-          ix = nx-2;
-        } 
-      } else { 
-        if(ixneigh == nx+1) {
-          ixneigh = nx;
-          ix = nx-1;
-        } 
+      if(ixneigh == nx) {
+        ixneigh = nx-1;
+        ix = nx-2;
       }
       if(iyneigh == NY) {
         iyneigh = NY-1;

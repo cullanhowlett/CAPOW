@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
     NRAND = read_survey_serial_ascii(randfile, randoms);
     if (NBAR_Column < 0) compute_nbar(0, NDATA, NRAND);
     if (FKP_Column < 0) {
-      printf("Computing FKP Weights...\n");
+      if (ThisTask == 0) printf("Computing FKP Weights...\n");
       compute_fkp(NDATA, data);
       compute_fkp(NRAND, randoms);
     }
@@ -158,6 +158,21 @@ int main(int argc, char **argv) {
   } else if (Survey) {
     // Subtract the random counts
     assign_survey_data(NRAND, randoms, -alpha);
+
+    // Copy across the extra slices from the task on the left and add it to the leftmost slices
+    // of the task on the right. Skip over tasks without any slices.
+    if (InterpOrder > 0) {
+      double * temp_ddg = (double *)malloc(InterpOrder*alloc_slice*sizeof(double));
+      ierr = MPI_Sendrecv(&(ddg[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
+                          &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
+      for (int i=0;i<InterpOrder*alloc_slice;i++) ddg[i] += temp_ddg[i];
+      if (DoInterlacing) {
+        ierr = MPI_Sendrecv(&(ddg_interlace[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
+                            &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
+        for (int i=0;i<InterpOrder*alloc_slice;i++) ddg_interlace[i] += temp_ddg[i];
+      }
+      free(temp_ddg);
+    }
   }
 
   if (Periodic) {
@@ -867,7 +882,7 @@ void create_grids(void) {
   ptrdiff_t alloc_local = fftw_mpi_local_size_3d(NX, NY, NZ/2+1, MPI_COMM_WORLD, &Local_nx, &Local_x_start);
   alloc_slice = 2*NY*(NZ/2+1);
   last_slice = Local_nx*alloc_slice;
-  Local_nxtra = Local_nx+InterpOrder;
+  Local_nxtra = Local_nx+InterpOrder-1;
   Total_size = 2*alloc_local+InterpOrder*alloc_slice;
 
   if (ThisTask == 0) {

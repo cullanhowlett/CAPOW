@@ -22,7 +22,7 @@ YMAX      3000.0     % The upper limit of the y-axis
 ZMIN     -3000.0     % The lower limit of the z-axis
 ZMAX      3000.0     % The upper limit of the z-axis
 InterpOrder    3     % The interpolation order for assigning the particles to the grid (1 = NN, 2 = CIC, 3 = TSC)
-DoInterlacing  0     % Whether or not to using interlacing to reduce aliasing (1 = Yes, 0 = No)
+DoInterlacing  1     % Whether or not to using interlacing to reduce aliasing (1 = Yes, 0 = No)
 
 % Output Specifications
 % =====================
