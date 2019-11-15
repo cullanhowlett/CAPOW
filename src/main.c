@@ -162,7 +162,7 @@ int main(int argc, char **argv) {
     // Copy across the extra slices from the task on the left and add it to the leftmost slices
     // of the task on the right. Skip over tasks without any slices.
     if (InterpOrder > 0) {
-      double * temp_ddg = (double *)calloc(InterpOrder*alloc_slice,sizeof(double));
+      double * temp_ddg = (double *)malloc(InterpOrder*alloc_slice*sizeof(double));
       ierr = MPI_Sendrecv(&(ddg[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
                           &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
       for (int i=0;i<InterpOrder*alloc_slice;i++) ddg[i] += temp_ddg[i];
@@ -882,7 +882,7 @@ void create_grids(void) {
   ptrdiff_t alloc_local = fftw_mpi_local_size_3d(NX, NY, NZ/2+1, MPI_COMM_WORLD, &Local_nx, &Local_x_start);
   alloc_slice = 2*NY*(NZ/2+1);
   last_slice = Local_nx*alloc_slice;
-  Local_nxtra = Local_nx+InterpOrder-1;
+  Local_nxtra = Local_nx+InterpOrder;
   Total_size = 2*alloc_local+InterpOrder*alloc_slice;
 
   if (ThisTask == 0) {
