@@ -102,7 +102,7 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
   int bufsize = 2000;
   int largebufsize = 8000000;
   char largebuf[largebufsize];
-  unsigned long long NREAD = 0;
+  unsigned long long NREAD = 0, NKEEP = 0;
 
   double XLOW = 1.0e-30, XHI = -1.0e30; 
   double YLOW = 1.0e-30, YHI = -1.0e30;
@@ -143,10 +143,30 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
     unsigned long largelen = strlen(buf)+1;
     while(largelen <= nbuf+nleft) {
       if(sscanf(buf,"%lf %lf %lf %lf\n",&tx,&ty,&tz,&tred)!=4) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+      NREAD++;
+      
+      if (ThisTask == 0) {
+        if ((NREAD % 1000000) == 0) {
+          printf("Read %llu objects, kept %llu\n", NREAD, NKEEP);
+          fflush(stdout);
+        }
+      }
 
       if (Coord_Type == 0) {
         tred = gsl_spline_eval(red_spline, sqrt(tx*tx + ty*ty + tz*tz), red_acc);
+        if ((tred < REDMININ) || (tred > REDMAXIN)) {
+          buf = strtok(NULL, "\n");
+          if (buf == NULL) break;
+          largelen += strlen(buf)+1;
+          continue;
+        }
       } else {
+        if ((tred < REDMININ) || (tred > REDMAXIN)) {
+          buf = strtok(NULL, "\n");
+          if (buf == NULL) break;
+          largelen += strlen(buf)+1;
+          continue;
+        }
         //double dist = comoving_distance(tred);
         double dist = gsl_spline_eval(dist_spline, tred, dist_acc);
         double ra = tx, dec = ty;
@@ -166,13 +186,13 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
       }
 
       // Add it to the data structure
-      inputdata[NREAD].coord[0] = tx;
-      inputdata[NREAD].coord[1] = ty;
-      inputdata[NREAD].coord[2] = tz;
-      inputdata[NREAD].redshift = tred;
-      if (NBAR_Column > 0) inputdata[NREAD].nbar = tnbar;
-      if (FKP_Column > 0) inputdata[NREAD].weight = tw;
-      NREAD++;
+      inputdata[NKEEP].coord[0] = tx;
+      inputdata[NKEEP].coord[1] = ty;
+      inputdata[NKEEP].coord[2] = tz;
+      inputdata[NKEEP].redshift = tred;
+      if (NBAR_Column > 0) inputdata[NKEEP].nbar = tnbar;
+      if (FKP_Column > 0) inputdata[NKEEP].weight = tw;
+      NKEEP++;
 
       if (tred < REDMIN) REDMIN = tred;
       if (tred > REDMAX) REDMAX = tred;
@@ -183,13 +203,6 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
       if (tx > XHI) XHI = tx;
       if (ty > YHI) YHI = ty;
       if (tz > ZHI) ZHI = tz;
-
-      if (ThisTask == 0) {
-        if ((NREAD % 1000000) == 0) {
-          printf("Read %llu objects\n", NREAD);
-          fflush(stdout);
-        }
-      }
 
       buf = strtok(NULL, "\n");
       if (buf == NULL) break;
@@ -213,7 +226,7 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
   } while (!ferror(fp));
 
   if (ThisTask == 0) {
-    printf("Read %llu objects\n", NREAD);
+    printf("Have %llu objects\n", NKEEP);
     printf("%12.6lf <   X  < %12.6lf\n", XLOW, XHI);
     printf("%12.6lf <   Y  < %12.6lf\n", YLOW, YHI);
     printf("%12.6lf <   Z  < %12.6lf\n", ZLOW, ZHI);
@@ -221,7 +234,7 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
 
   fclose(fp);
 
-  return (double)NREAD;
+  return (double)NKEEP;
 }
 
 // Calculates the comoving distance from the redshift

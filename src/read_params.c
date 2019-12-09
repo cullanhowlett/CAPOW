@@ -162,6 +162,14 @@ void read_parameterfile(char * fname) {
   addr[nt] = &Z_Origin;
   id[nt++] = FLOAT;
 
+  strcpy(tag[nt], "REDMININ");
+  addr[nt] = &REDMININ;
+  id[nt++] = FLOAT;
+
+  strcpy(tag[nt], "REDMAXIN");
+  addr[nt] = &REDMAXIN;
+  id[nt++] = FLOAT;
+
   strcpy(tag[nt], "NOBJ_Max");
   addr[nt] = &NOBJ_Max;
   id[nt++] = INT;

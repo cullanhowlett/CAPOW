@@ -103,6 +103,8 @@ double SkyArea;    // The effective solid angle area of the survey in square deg
 double FKP_Pk;     // The value to use for computing the FKP weights (if necessary)  
 double REDMIN;     // The minimum redshift of the data (used for computing the nbar)    
 double REDMAX;     // The maximum redshift of the data (used for computing the nbar) 
+double REDMININ;       // The minimum redshift to include in the input
+double REDMAXIN;       // The maximum redshift to include in the input
 double X_Origin;   // The coodinate of the observer in the box in the x-direction
 double Y_Origin;   // The coodinate of the observer in the box in the y-direction
 double Z_Origin;   // The coodinate of the observer in the box in the z-direction

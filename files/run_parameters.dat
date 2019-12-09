@@ -48,6 +48,8 @@ Survey         1       % Tell the code this is data from a periodic simulation (
 X_Origin       0       % The location of the observer in the x-direction
 Y_Origin       0       % The location of the observer in the y-direction
 Z_Origin       0       % The location of the observer in the z-direction
+REDMININ         0.7     % The minimum redshift to include in the input data
+REDMAXIN         1.0     % The maximum redshift to include in the input data
 NOBJ_Max    36026264   % The maximum number of objects to read in (of any single type type, data or randoms, for allocating space)
 Coord_Type     1	   % Are the input coordinates in cartesian coordinates, angular degrees, or angular radians? (0, 1 and otherwise respectively)
 x_Column       1       % The column in the input file containing the x coordinates or RA values (1 is first column)
