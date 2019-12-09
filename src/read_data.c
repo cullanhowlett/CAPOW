@@ -142,7 +142,7 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
     char * buf = strtok(largebuf, "\n");
     unsigned long largelen = strlen(buf)+1;
     while(largelen <= nbuf+nleft) {
-      if(sscanf(buf,"%lf %lf %lf %lf\n",&tx,&ty,&tz,&tred)!=4) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+      if(sscanf(buf,"%lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tred,&tnbar)!=5) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
       NREAD++;
       
       if (ThisTask == 0) {
