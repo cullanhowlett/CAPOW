@@ -65,9 +65,10 @@ int main(int argc, char **argv) {
     printf("========================================\n");
     fflush(stdout);
   }
+  double NPERIODIC;
   unsigned long long NDATA, NRAND;
   if (Periodic) {
-    NDATA = read_periodic_serial_ascii();
+    NPERIODIC = read_periodic_serial_ascii();
   } else if (Survey) {
     char datafile[2000], randfile[2000];
     REDMIN = 1.0e30, REDMAX = -1.0e30;
@@ -96,12 +97,12 @@ int main(int argc, char **argv) {
   // needed for the mean density, shot-noise and normalisation
   double alpha, shot, norm;
   if (Periodic) {
-    double NDATA_TOT = 0;
-    MPI_Allreduce(&NDATA, &NDATA_TOT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    alpha  = NDATA_TOT/((double)NX*(double)NY*(double)NZ);
-    double nbar  = NDATA_TOT/((XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN));
-    double shot  = NDATA_TOT;
-    double norm  = nbar*NDATA_TOT;
+    double NPERIODIC_TOT = 0;
+    MPI_Allreduce(&NPERIODIC, &NPERIODIC_TOT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    alpha  = NPERIODIC_TOT/((double)NX*(double)NY*(double)NZ);
+    double nbar  = NPERIODIC_TOT/((XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN));
+    shot  = NPERIODIC_TOT;
+    norm  = nbar*NPERIODIC_TOT;
     if (ThisTask == 0) {
       printf("mean          = %g\n",alpha);
       printf("nbar          = %g\n",nbar);
@@ -161,7 +162,7 @@ int main(int argc, char **argv) {
 
     // Copy across the extra slices from the task on the left and add it to the leftmost slices
     // of the task on the right. Skip over tasks without any slices.
-    if (InterpOrder > 0) {
+    if (InterpOrder > 1) {
       double * temp_ddg = (double *)malloc(InterpOrder*alloc_slice*sizeof(double));
       ierr = MPI_Sendrecv(&(ddg[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
                           &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
@@ -314,18 +315,21 @@ void compute_periodic_power(void) {
  
           // This is necessary because we are only looping over half the grid in the z axis
           // so we need to fully account for the assumed hermitian symmetry in the data
-          double NM = 2.0;
+          int NM = 2;
           if (k == 0) {
             if (j == 0) {
-              if ((i != 0) && (i != NX/2)) NM = 1.0;
+              if ((i != 0) && (i != NX/2)) NM = 1;
             } else {
-              if (i != NX/2) NM = 1.0;
+              if (i != NX/2) NM = 1;
             } 
           }
 
           // Get the power, multiply by the relevant Legendre polynomials and add to the bin
-          double L2 = 1.5*mu*mu - 0.5;
-          double L4 = 4.375*mu*mu*mu*mu - 3.75*mu*mu + 0.375;
+          double L2 = 0.0, L4 = 0.0;
+          if (LOS != 0) {
+            L2 = 1.5*mu*mu - 0.5;
+            L4 = 4.375*mu*mu*mu*mu - 3.75*mu*mu + 0.375;
+          }
           double power = (dkr*dkr+dki*dki)*grid_cor;
           Pk0[kbin]   += NM*power;
           Pk2[kbin]   += NM*L2*power;
@@ -742,6 +746,7 @@ void output_power(double shot, double norm) {
       Nmodes_2D_glob = (int*)calloc(NK*NMU, sizeof(int));
     }
   }
+
   MPI_Reduce(Pk0, Pk0_glob, NK, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   MPI_Reduce(Pk2, Pk2_glob, NK, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   MPI_Reduce(Pk4, Pk4_glob, NK, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -882,7 +887,11 @@ void create_grids(void) {
   ptrdiff_t alloc_local = fftw_mpi_local_size_3d(NX, NY, NZ/2+1, MPI_COMM_WORLD, &Local_nx, &Local_x_start);
   alloc_slice = 2*NY*(NZ/2+1);
   last_slice = Local_nx*alloc_slice;
-  Local_nxtra = Local_nx+InterpOrder;
+  if (Periodic) {
+    Local_nxtra = Local_nx+InterpOrder;
+  } else {
+    Local_nxtra = Local_nx+InterpOrder;
+  }
   Total_size = 2*alloc_local+InterpOrder*alloc_slice;
 
   if (ThisTask == 0) {

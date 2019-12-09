@@ -285,12 +285,19 @@ void check_inputs(void) {
   }
 
   if (Periodic) {
-    if ((LOS != 1) && (LOS != 2) && (LOS != 3)) {
+    if ((LOS != 0) && (LOS != 1) && (LOS != 2) && (LOS != 3)) {
       if (ThisTask == 0) {
-        printf("\nERROR: `LOS' is neither 1, 2 nor 3.\n");
+        printf("\nERROR: `LOS' is neither 0 (real-space), 1, 2 nor 3.\n");
         printf("        Please choose a suitable value for `LOS'.\n\n");
       }
       FatalError((char *)"read_param.c", 354);
+    }
+    if (Odd_Multipoles) {
+      if (ThisTask == 0) {
+        printf("\nWARNING: Odd multipoles not implemented for periodic box.\n");
+        printf("         Setting Odd_Multipoles == 0.\n\n");
+      }
+      Odd_Multipoles = 0;
     }
   }
 

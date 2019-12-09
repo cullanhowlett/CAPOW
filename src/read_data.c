@@ -55,12 +55,14 @@ double read_periodic_serial_ascii(void) {
 
     // These lines will probably need changing to match the input data format.
     double w = 1.0;
-    double tx,ty,tz,tz_rsd;
-    if(sscanf(buf,"%lf %lf %lf %lf\n",&tx,&ty,&tz,&tz_rsd)!=4) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
-    tz = tz_rsd;
+    double tx,ty,tz,tvx,tvy,tvz;
+    //if(sscanf(buf,"%lf %lf %lf %lf\n",&tx,&ty,&tz,&tz_rsd)!=4) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+    //tz = tz_rsd;
+    if(sscanf(buf,"%lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tvx,&tvy,&tvz)!=6) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+
 
     NREAD += w;
-    if ((tx < XMIN) || (tx >= XMAX) || (ty < YMIN) || (ty >= YMAX) || (tz < ZMIN) || (tz >= ZMAX)) {
+    if ((tx < XMIN) || (tx > XMAX) || (ty < YMIN) || (ty > YMAX) || (tz < ZMIN) || (tz > ZMAX)) {
       printf("Task %d has particle out of grid bounds: x=%lf, y=%lf, z=%lf\n", ThisTask, tx, ty, tz);
       FatalError("read_data", 110);
     }
@@ -98,7 +100,8 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
 
   FILE * fp;
   int bufsize = 2000;
-  char buf[bufsize];
+  int largebufsize = 8000000;
+  char largebuf[largebufsize];
   unsigned long long NREAD = 0;
 
   double XLOW = 1.0e-30, XHI = -1.0e30; 
@@ -123,84 +126,91 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
   if((fp=fopen(inputfile,"r"))==NULL) { printf("Task %d cannot open input file\n", ThisTask);  FatalError("read_data", 113); }
 
   // Loop over each line and store the data coordinates
-  // We skip over any lines starting with `#' as we assume they are headers
   // The exact format may need modifying
-  int strlen = x_Column;
-  if (y_Column > strlen) strlen = y_Column;
-  if (z_Column > strlen) strlen = z_Column;
-  if (NBAR_Column > strlen) strlen = NBAR_Column;
-  if (FKP_Column > strlen) strlen = FKP_Column;
-  while(fgets(buf,bufsize,fp)) {
-    if(strncmp(buf,"#",1)==0) continue;
+  int nleft=0;
+  char leftover[bufsize];
 
-    char *bufp = buf;
-    int offset;
-    double val;
-    /*double tx, ty, tz, tred, tnbar, tw;
-    for (int i=1; i<=strlen; i++) {
-      sscanf(bufp, "%lf%n", &val, &offset);
-      if (i == x_Column) tx = val;
-      if (i == y_Column) ty = val;
-      if (i == z_Column) {
-        tz = val;
-        if (Coord_Type != 0) tred = tz;
+  int nbuf = fread(largebuf+nleft, 1, largebufsize-nleft-1, fp);
+  largebuf[largebufsize-1] = '\0';
+  //printf("%d\n", nbuf + nleft);
+  do {
+
+    //printf("%s\n", largebuf);
+
+    double tx, ty, tz, tred, tnbar, tw;
+
+    char * buf = strtok(largebuf, "\n");
+    unsigned long largelen = strlen(buf)+1;
+    while(largelen <= nbuf+nleft) {
+      if(sscanf(buf,"%lf %lf %lf %lf\n",&tx,&ty,&tz,&tred)!=4) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+
+      if (Coord_Type == 0) {
+        tred = gsl_spline_eval(red_spline, sqrt(tx*tx + ty*ty + tz*tz), red_acc);
+      } else {
+        //double dist = comoving_distance(tred);
+        double dist = gsl_spline_eval(dist_spline, tred, dist_acc);
+        double ra = tx, dec = ty;
+        if (Coord_Type == 1) {
+          ra *= (M_PI/180.0);
+          dec *= (M_PI/180.0);
+        }
+        tx = dist*cos(dec)*cos(ra);
+        ty = dist*cos(dec)*sin(ra);
+        tz = dist*sin(dec);
       }
-      if (i == NBAR_Column) tnbar = val;
-      if (i == FKP_Column) tw = val;
-      bufp += offset;
-    }*/
-    double tx, ty, tz, tz_rsd, tred, tnbar, tw;
-    if(sscanf(buf,"%lf %lf %lf %lf\n",&tx,&ty,&tz,&tred)!=4) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
 
-    // Compute the redshift if we only had cartesian coordinates, otherwise convert to cartesian coordinates
-    if (Coord_Type == 0) {
-      tred = gsl_spline_eval(red_spline, sqrt(tx*tx + ty*ty + tz*tz), red_acc);
+      // Check the data can fit in the grid including whatever interpolation order we are using
+      if ((tx < XMIN_Interp) || (tx >= XMAX_Interp) || (ty < YMIN_Interp) || (ty >= YMAX_Interp) || (tz < ZMIN_Interp) || (tz >= ZMAX_Interp)) {
+        printf("Task %d has object out of grid bounds for chosen InterpOrder: x=%lf, y=%lf, z=%lf\n", ThisTask, tx, ty, tz);
+        FatalError("read_data", 155);
+      }
+
+      // Add it to the data structure
+      inputdata[NREAD].coord[0] = tx;
+      inputdata[NREAD].coord[1] = ty;
+      inputdata[NREAD].coord[2] = tz;
+      inputdata[NREAD].redshift = tred;
+      if (NBAR_Column > 0) inputdata[NREAD].nbar = tnbar;
+      if (FKP_Column > 0) inputdata[NREAD].weight = tw;
+      NREAD++;
+
+      if (tred < REDMIN) REDMIN = tred;
+      if (tred > REDMAX) REDMAX = tred;
+
+      if (tx < XLOW) XLOW = tx;
+      if (ty < YLOW) YLOW = ty;
+      if (tz < ZLOW) ZLOW = tz;
+      if (tx > XHI) XHI = tx;
+      if (ty > YHI) YHI = ty;
+      if (tz > ZHI) ZHI = tz;
+
+      if (ThisTask == 0) {
+        if ((NREAD % 1000000) == 0) {
+          printf("Read %llu objects\n", NREAD);
+          fflush(stdout);
+        }
+      }
+
+      buf = strtok(NULL, "\n");
+      if (buf == NULL) break;
+      largelen += strlen(buf)+1;
+    }
+
+    if (feof(fp)) break;
+
+    if (buf == NULL) {
+      nleft = 0;
     } else {
-      //double dist = comoving_distance(tred);
-      double dist = gsl_spline_eval(dist_spline, tred, dist_acc);
-      double ra = tx, dec = ty;
-      if (Coord_Type == 1) {
-        ra *= (M_PI/180.0);
-        dec *= (M_PI/180.0);
-      }
-      tx = dist*cos(dec)*cos(ra);
-      ty = dist*cos(dec)*sin(ra);
-      tz = dist*sin(dec);
+      nleft = strlen(buf);
+      memcpy(leftover, buf, nleft);
+      leftover[nleft] = '\0';
+      memcpy(largebuf, leftover, nleft);
     }
+    nbuf = fread(largebuf+nleft, 1, largebufsize-nleft-1, fp);
+    largebuf[largebufsize-1] = '\0';
+    //printf("%d\n", nbuf + nleft);
 
-    // Check the data can fit in the grid including whatever interpolation order we are using
-    if ((tx < XMIN_Interp) || (tx >= XMAX_Interp) || (ty < YMIN_Interp) || (ty >= YMAX_Interp) || (tz < ZMIN_Interp) || (tz >= ZMAX_Interp)) {
-      printf("Task %d has object out of grid bounds for chosen InterpOrder: x=%lf, y=%lf, z=%lf\n", ThisTask, tx, ty, tz);
-      FatalError("read_data", 155);
-    }
-
-    // Add it to the data structure
-    inputdata[NREAD].coord[0] = tx;
-    inputdata[NREAD].coord[1] = ty;
-    inputdata[NREAD].coord[2] = tz;
-    inputdata[NREAD].redshift = tred;
-    if (NBAR_Column > 0) inputdata[NREAD].nbar = tnbar;
-    if (FKP_Column > 0) inputdata[NREAD].weight = tw;
-    NREAD ++;
-
-    if (tred < REDMIN) REDMIN = tred;
-    if (tred > REDMAX) REDMAX = tred;
-
-    if (tx < XLOW) XLOW = tx;
-    if (ty < YLOW) YLOW = ty;
-    if (tz < ZLOW) ZLOW = tz;
-    if (tx > XHI) XHI = tx;
-    if (ty > YHI) YHI = ty;
-    if (tz > ZHI) ZHI = tz;
-
-    if (ThisTask == 0) {
-      if ((NREAD % 1000000) == 0) {
-        printf("Read %llu objects\n", NREAD);
-        fflush(stdout);
-      }
-    }
-
-  }
+  } while (!ferror(fp));
 
   if (ThisTask == 0) {
     printf("Read %llu objects\n", NREAD);
@@ -208,6 +218,8 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
     printf("%12.6lf <   Y  < %12.6lf\n", YLOW, YHI);
     printf("%12.6lf <   Z  < %12.6lf\n", ZLOW, ZHI);
   }
+
+  fclose(fp);
 
   return (double)NREAD;
 }
@@ -282,10 +294,7 @@ void compute_nbar(int parallel, unsigned long long NDATA, unsigned long long NRA
   gsl_spline_init(nbar_spline, znbar, nbar, nbins+2);
 
   // Assign the number density to each data and random point
-  for (unsigned long long i=0; i<NDATA; i++) {
-    data[i].nbar = gsl_spline_eval(nbar_spline, data[i].redshift, nbar_acc);
-    //if (fabs(data[i].nbar) > 1.0e-3) printf("%lf, %lf\n", data[i].redshift, data[i].nbar);
-  }
+  for (unsigned long long i=0; i<NDATA; i++) data[i].nbar = gsl_spline_eval(nbar_spline, data[i].redshift, nbar_acc);
   for (unsigned long long i=0; i<NRAND; i++) randoms[i].nbar = gsl_spline_eval(nbar_spline, randoms[i].redshift, nbar_acc);
 
   free(znbar);
@@ -476,30 +485,11 @@ double add_to_grid(double x, double y, double z, double w, double xmin, double x
         if(iz >= NZ) iz = 0;
         if(izneighhi >= 1) izneighhi = 1;
       }
-      }
-      if(ixneighhi >= nx) ixneighhi = nx;
-      if(iyneighhi >= NY) {
-        iyneighhi -= NY;
-        if(iy >= NY) iy = 0;
-        if(iyneighhi >= 1) iyneighhi = 1;
-      }
-      if(izneighhi >= NZ) {
-        izneighhi -= NZ;
-        if(iz >= NZ) iz = 0;
-        if(izneighhi >= 1) izneighhi = 1;
     } else if (Survey) {
-      if (ThisTask == NTask-1) {
-        if(ixneighhi == nx) {
-          ixneighhi = nx-1;
-          ix = nx-2;
-          ixneighlow = nx-3;
-        } 
-      } else { 
-        if(ixneighhi == nx+1) {
-          ixneighhi = nx;
-          ix = nx-1;
-          ixneighlow = nx-2;
-        } 
+      if(ixneighhi == nx) {
+        ixneighhi = nx-1;
+        ix = nx-2;
+        ixneighlow = nx-3;
       }
       if(iyneighhi == NY) {
         iyneighhi = NY-1;
