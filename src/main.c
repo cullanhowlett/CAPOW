@@ -384,8 +384,20 @@ void compute_survey_power(void) {
         printf("===============================================\n");
         fflush(stdout);
       }
-      fftw_execute(plan);
-      if (DoInterlacing) fftw_execute(plan_interlace);
+      
+      // We need to do this as we store the density field before the FFT
+	  for (int ix=0; ix<Local_nx; ix++) {
+	    for (int iy=0; iy<NY; iy++) {
+	      for (int iz=0; iz<NZ; iz++) {
+	        long ind = iz+2*(NZ/2+1)*(iy+NY*ix);
+	        ddg_2[ind] = ddg[ind];
+	        ddg_interlace_2[ind] = ddg_interlace[ind];
+	      }
+	    }
+	  }
+
+      fftw_execute(plan_2);
+      if (DoInterlacing) fftw_execute(plan_interlace_2);
       assign_survey_power(0, 0, 0, 0);
     }
 
