@@ -150,6 +150,10 @@ void read_parameterfile(char * fname) {
   addr[nt] = &Survey;
   id[nt++] = INT;
 
+  strcpy(tag[nt], "Momentum");
+  addr[nt] = &Momentum;
+  id[nt++] = INT;
+
   strcpy(tag[nt], "X_Origin");
   addr[nt] = &X_Origin;
   id[nt++] = FLOAT;
@@ -204,6 +208,14 @@ void read_parameterfile(char * fname) {
 
   strcpy(tag[nt], "FKP_Pk");
   addr[nt] = &FKP_Pk;
+  id[nt++] = FLOAT;
+
+  strcpy(tag[nt], "FKP_Pk_mom");
+  addr[nt] = &FKP_Pk_mom;
+  id[nt++] = FLOAT;
+
+  strcpy(tag[nt], "FKP_Pk_cross");
+  addr[nt] = &FKP_Pk_cross;
   id[nt++] = FLOAT;
 
   strcpy(tag[nt], "Odd_Multipoles");

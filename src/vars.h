@@ -49,19 +49,22 @@ extern MPI_Status status;    // The MPI error status
 // Global variables for the grids
 extern int * Slab_to_task;         // The task to which each slice is assigned
 extern int * Local_nx_table;       // The number of slices on each of the tasks
-extern double * F0;                // Density grid for storing fourier transformed monopole
+extern double * F0, * F0_mom;                // Density grid for storing fourier transformed monopole
 extern double * ddg, * ddg_2;      // The density grids for storing data
 extern double * ddg_interlace;     // Extra density grids for interlacing
 extern double * ddg_interlace_2;   // Extra density grids for interlacing
+extern double * ddg_mom, * ddg_mom_2;      // The density grids for storing data
+extern double * ddg_mom_interlace;     // Extra density grids for interlacing
+extern double * ddg_mom_interlace_2;   // Extra density grids for interlacing
 extern ptrdiff_t Local_nx;         // The number of slices on the task
 extern ptrdiff_t last_slice;       // The last slice of the density/force grids (maybe equal to alloc_local)
 extern ptrdiff_t Total_size;       // The total byte-size of the grids on each processor
 extern ptrdiff_t Local_nxtra;      // The number of slices on the task accounting for buffer required for interlacing/interpolation
 extern ptrdiff_t alloc_slice;      // The byte-size of a slice of the density/force grids
 extern ptrdiff_t Local_x_start;    // The global start of the slices on the task
-extern fftw_plan plan, plan_2;     // The plans for the in-place FFT of the density grid
+extern fftw_plan plan, plan_mom;     // The plans for the in-place FFT of the density grid
 extern fftw_plan plan_interlace;   // The plans for the in-place FFT of the density grid
-extern fftw_plan plan_interlace_2; // The plans for the in-place FFT of the density grid
+extern fftw_plan plan_mom_interlace; // The plans for the in-place FFT of the density grid
 
 // Parameters for input and output files
 extern char FileBase[500];      // The base input filename
@@ -106,6 +109,7 @@ extern int Periodic; // Tell the code this is data from a periodic simulation (t
 
 // Parameters for survey data
 extern int Survey;         // Tell the code this is data from a periodic simulation (this or Periodic must be set to 1)
+extern int Momentum;       // Whether or not to compute the momentum auto/cross power spectra (0 == density, 1 == momentum, otherwise == cross)
 extern int NOBJ_Max;       // The maximum number of objects to read in (of any single type type, data or randoms, for allocating space)
 extern int x_Column;       // The column in the input file containing the x coordinates or RA values
 extern int y_Column;       // The column in the input file containing the y coordinates or Dec values
@@ -116,6 +120,8 @@ extern int NBAR_Column;    // The column in the input file containing the nbar v
 extern int Odd_Multipoles; // Flag to tell the code whether or not to compute the odd-order multipoles
 extern double SkyArea;    // The effective solid angle area of the survey in square degrees (if necessary)
 extern double FKP_Pk;     // The value to use for computing the FKP weights (if necessary)
+extern double FKP_Pk_mom;     // The value to use for computing the FKP weights (if necessary)
+extern double FKP_Pk_cross;     // The value to use for computing the FKP weights (if necessary)
 extern double REDMIN;     // The minimum redshift of the data (used for computing the nbar)    
 extern double REDMAX;     // The maximum redshift of the data (used for computing the nbar) 
 extern double REDMININ;       // The minimum redshift to include in the input
@@ -123,11 +129,13 @@ extern double REDMAXIN;       // The maximum redshift to include in the input
 extern double X_Origin;   // The coodinate of the observer in the box in the x-direction
 extern double Y_Origin;   // The coodinate of the observer in the box in the y-direction
 extern double Z_Origin;   // The coodinate of the observer in the box in the z-direction
+extern double nsq, vr_ave, vrsq_ave; // Variables needed for momentum power spectra 
 
 // Structures for survey data
 extern struct survey_data { 
-  float coord[3];          // The cartesian coordinates of the object
-  float redshift;          // The redshift of the object
-  float nbar;            // The nbar at the objects location
-  float weight;            // The weight of the object
+  float coord[3];             // The cartesian coordinates of the object
+  float redshift;             // The redshift of the object
+  float nbar;                 // The nbar at the objects location
+  float weight, weight_pv;            // The weight of the object
+  float pv, pverr;        // The peculiar velocity and its error
 } *data, *randoms;

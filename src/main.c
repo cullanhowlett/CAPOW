@@ -73,16 +73,18 @@ int main(int argc, char **argv) {
     char datafile[2000], randfile[2000];
     REDMIN = 1.0e30, REDMAX = -1.0e30;
     if(!(data = (struct survey_data *) malloc(NOBJ_Max*sizeof(struct survey_data)))) { printf("Task %d unable to allocate memory for data\n", ThisTask);  FatalError("main", 72); }
-    if(!(randoms = (struct survey_data *) malloc(NOBJ_Max*sizeof(struct survey_data)))) { printf("Task %d unable to allocate memory for randoms\n", ThisTask);  FatalError("main", 72); }
     sprintf(datafile, "%s/%s", InputDir, FileBase);
-    sprintf(randfile, "%s/%s", InputDir, RandFileBase);
-    NDATA = read_survey_serial_ascii(datafile, data);
-    NRAND = read_survey_serial_ascii(randfile, randoms);
+    NDATA = read_survey_serial_ascii(datafile, data, 0);
+    if (Momentum != 1) {
+      if(!(randoms = (struct survey_data *) malloc(NOBJ_Max*sizeof(struct survey_data)))) { printf("Task %d unable to allocate memory for randoms\n", ThisTask);  FatalError("main", 72); }
+      sprintf(randfile, "%s/%s", InputDir, RandFileBase);
+      NRAND = read_survey_serial_ascii(randfile, randoms, 1);
+    }
     if (NBAR_Column < 0) compute_nbar(0, NDATA, NRAND);
     if (FKP_Column < 0) {
       if (ThisTask == 0) printf("Computing FKP Weights...\n");
       compute_fkp(NDATA, data);
-      compute_fkp(NRAND, randoms);
+      if (Momentum != 1) compute_fkp(NRAND, randoms);
     }
     assign_survey_data(NDATA, data, 1.0);
   }
@@ -97,44 +99,89 @@ int main(int argc, char **argv) {
   // needed for the mean density, shot-noise and normalisation
   double alpha, shot, norm;
   if (Periodic) {
-    double NPERIODIC_TOT = 0;
+    double NPERIODIC_TOT = 0, NSQ_TOT = 0.0, VR_TOT = 0.0, VRSQ_TOT = 0.0;
     MPI_Allreduce(&NPERIODIC, &NPERIODIC_TOT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    if (Momentum) {
+   	  MPI_Allreduce(&nsq, &NSQ_TOT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+      MPI_Allreduce(&vr_ave, &VR_TOT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+      MPI_Allreduce(&vrsq_ave, &VRSQ_TOT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    }
     alpha  = NPERIODIC_TOT/((double)NX*(double)NY*(double)NZ);
     double nbar  = NPERIODIC_TOT/((XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN));
     shot  = NPERIODIC_TOT;
     norm  = nbar*NPERIODIC_TOT;
+    if (Momentum) {
+      VR_TOT /= (double)NPERIODIC_TOT;
+      VRSQ_TOT /= (double)NSQ_TOT;
+    }
     if (ThisTask == 0) {
       printf("mean          = %g\n",alpha);
       printf("nbar          = %g\n",nbar);
       printf("shot-noise    = %g\n",shot);
       printf("normalisation = %g\n",norm);
+      if (Momentum) {
+      	printf("vr_ave = %g\n",VR_TOT);
+        printf("vrsq_ave = %g\n",VRSQ_TOT); 
+      }
       fflush(stdout);
     }
   } else if (Survey) {
-    double data_nbw = 0.0, data_nbwsq = 0.0, data_nbsqwsq = 0.0; 
+    double data_nbw = 0.0, data_nbwsq = 0.0, data_nbsqwsq = 0.0, data_vr = 0.0, data_vrsq = 0.0; 
     double rand_nbw = 0.0, rand_nbwsq = 0.0, rand_nbsqwsq = 0.0;
     for (unsigned long long i=0;i<NDATA;i++) {
-      data_nbw     += data[i].weight;
-      data_nbwsq   += data[i].weight*data[i].weight;
-      data_nbsqwsq += data[i].weight*data[i].weight*data[i].nbar;
+      if ((Momentum == 0) || (Momentum == 1)) {
+        data_nbw     += data[i].weight;
+        data_nbwsq   += data[i].weight*data[i].weight;
+        data_nbsqwsq += data[i].weight*data[i].weight*data[i].nbar;
+        if (Momentum) {
+      	  data_vr += data[i].weight*data[i].weight*data[i].pv;
+      	  data_vrsq += data[i].weight*data[i].weight*data[i].pv*data[i].pv;
+        }
+      } else {
+        data_nbw     += data[i].weight;
+        data_nbwsq   += data[i].weight*data[i].weight_pv;
+        data_nbsqwsq += data[i].weight*data[i].weight_pv*data[i].nbar;
+      	data_vr += data[i].weight*data[i].weight_pv*data[i].pv;
+      	data_vrsq += data[i].weight*data[i].weight_pv*data[i].pv*data[i].pv;	
+      }
     }
-    for (unsigned long long i=0;i<NRAND;i++) {
-      rand_nbw     += randoms[i].weight;
-      rand_nbwsq   += randoms[i].weight*randoms[i].weight;
-      rand_nbsqwsq += randoms[i].weight*randoms[i].weight*randoms[i].nbar;
+    if (Momentum == 0) {
+      for (unsigned long long i=0;i<NRAND;i++) {
+        rand_nbw     += randoms[i].weight;
+        rand_nbwsq   += randoms[i].weight*randoms[i].weight;
+        rand_nbsqwsq += randoms[i].weight*randoms[i].weight*randoms[i].nbar;
+      }
+    } else if (Momentum == 2) {
+      for (unsigned long long i=0;i<NRAND;i++) {
+        rand_nbw     += randoms[i].weight;
+        rand_nbwsq   += randoms[i].weight*randoms[i].weight_pv;
+        rand_nbsqwsq += randoms[i].weight*randoms[i].weight_pv*randoms[i].nbar;
+      }
     }
 
     alpha = data_nbw/rand_nbw;
     rand_nbwsq   *= alpha*alpha;
     rand_nbsqwsq *= alpha;
 
-    shot = data_nbwsq + rand_nbwsq;
-    norm = rand_nbsqwsq;
+    if (Momentum == 0) {
+	  shot = data_nbwsq + rand_nbwsq;
+	  norm = data_nbsqwsq;
+    } else if (Momentum == 1) {
+      shot = data_vrsq;
+      norm = data_nbsqwsq;
+    } else {
+      shot = data_vr;
+      norm = data_nbsqwsq;
+    }
 
     if (ThisTask == 0) {
       printf("alpha = %g\n",alpha);
       printf("shot-noise [data, randoms]    = %g, %g\n",data_nbwsq, rand_nbwsq);
       printf("normalisation [data, randoms] = %g, %g\n",data_nbsqwsq, rand_nbsqwsq);
+      if (Momentum) {
+      	printf("# vr_zero   = %g\n",data_vr);
+        printf("# vrsq_zero   = %g\n",data_vrsq);
+      }
       fflush(stdout);
     }
   }
@@ -146,19 +193,21 @@ int main(int argc, char **argv) {
   }
   if (Periodic) {
     // Subtract the mean density off of each cell
-    int i, j, k;
-    for (i=0; i<Local_nx; i++) {
-      for (j=0; j<NY; j++) {
-        for (k=0; k<NZ; k++) {
-          unsigned long long ind = k+2*(NZ/2+1)*(j+NY*i);
-          ddg[ind] -= alpha;
-          if (DoInterlacing) ddg_interlace[ind] -= alpha;
+    if (Momentum != 1) {
+      int i, j, k;
+      for (i=0; i<Local_nx; i++) {
+        for (j=0; j<NY; j++) {
+          for (k=0; k<NZ; k++) {
+            unsigned long long ind = k+2*(NZ/2+1)*(j+NY*i);
+            ddg[ind] -= alpha;
+            if (DoInterlacing) ddg_interlace[ind] -= alpha;
+          }
         }
       }
     }
   } else if (Survey) {
     // Subtract the random counts
-    assign_survey_data(NRAND, randoms, -alpha);
+    if (Momentum != 1) assign_survey_data(NRAND, randoms, -alpha);
 
     // Copy across the extra slices from the task on the left and add it to the leftmost slices
     // of the task on the right. Skip over tasks without any slices.
@@ -174,6 +223,20 @@ int main(int argc, char **argv) {
       }
       free(temp_ddg);
     }
+    if ((Momentum != 0) && (Momentum != 1)) {
+      if (InterpOrder > 1) {
+        double * temp_ddg = (double *)malloc(InterpOrder*alloc_slice*sizeof(double));
+        ierr = MPI_Sendrecv(&(ddg_mom[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
+                            &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
+        for (int i=0;i<InterpOrder*alloc_slice;i++) ddg_mom[i] += temp_ddg[i];
+        if (DoInterlacing) {
+          ierr = MPI_Sendrecv(&(ddg_mom_interlace[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
+                              &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
+          for (int i=0;i<InterpOrder*alloc_slice;i++) ddg_mom_interlace[i] += temp_ddg[i];
+        }
+        free(temp_ddg);
+      }
+    }
   }
 
   if (Periodic) {
@@ -184,6 +247,10 @@ int main(int argc, char **argv) {
     }
     fftw_execute(plan);
     if (DoInterlacing) fftw_execute(plan_interlace);
+    if ((Momentum != 0) && (Momentum != 1)) {
+   	  fftw_execute(plan_mom);
+      if (DoInterlacing) fftw_execute(plan_mom_interlace);
+    }
 
     if (ThisTask == 0) {
       printf("\nIterating over grid cells\n"); 
@@ -312,6 +379,21 @@ void compute_periodic_power(void) {
             dkr += dkr_interlace*cosk - dki_interlace*sink;
             dki += dkr_interlace*sink + dki_interlace*cosk;
           }
+          double dkr_mom, dki_mom;
+          if ((Momentum != 0) && (Momentum != 1)) {
+          	dkr_mom = ddg_mom[(2*k  )+2*(NZ/2+1)*(j+NY*(i-Local_x_start))];
+            dki_mom = ddg_mom[(2*k+1)+2*(NZ/2+1)*(j+NY*(i-Local_x_start))]; 
+            if (DoInterlacing) {
+              grid_cor *= 0.25;
+              double kh = ax+ay+az;
+              double sink = sin(kh);
+              double cosk = cos(kh);
+              double dkr_mom_interlace = ddg_mom_interlace[(2*k  )+2*(NZ/2+1)*(j+NY*(i-Local_x_start))];
+              double dki_mom_interlace = ddg_mom_interlace[(2*k+1)+2*(NZ/2+1)*(j+NY*(i-Local_x_start))]; 
+              dkr_mom += dkr_mom_interlace*cosk - dki_mom_interlace*sink;
+              dki_mom += dkr_mom_interlace*sink + dki_mom_interlace*cosk;
+            }
+          }
  
           // This is necessary because we are only looping over half the grid in the z axis
           // so we need to fully account for the assumed hermitian symmetry in the data
@@ -330,7 +412,12 @@ void compute_periodic_power(void) {
             L2 = 1.5*mu*mu - 0.5;
             L4 = 4.375*mu*mu*mu*mu - 3.75*mu*mu + 0.375;
           }
-          double power = (dkr*dkr+dki*dki)*grid_cor;
+          double power;
+          if ((Momentum == 0) || (Momentum == 1)) {
+            power = (dkr*dkr+dki*dki)*grid_cor;
+       	  } else {
+       	  	power = (dkr*dki_mom-dki*dkr_mom)*grid_cor;
+       	  }
           Pk0[kbin]   += NM*power;
           Pk2[kbin]   += NM*L2*power;
           Pk4[kbin]   += NM*L4*power;
@@ -396,8 +483,22 @@ void compute_survey_power(void) {
 	    }
 	  }
 
-      fftw_execute(plan_2);
-      if (DoInterlacing) fftw_execute(plan_interlace_2);
+      fftw_execute(plan);
+      if (DoInterlacing) fftw_execute(plan_interlace);
+      if ((Momentum != 0) && (Momentum != 1)) {
+        for (int ix=0; ix<Local_nx; ix++) {
+	      for (int iy=0; iy<NY; iy++) {
+	        for (int iz=0; iz<NZ; iz++) {
+	          long ind = iz+2*(NZ/2+1)*(iy+NY*ix);
+	          ddg_mom_2[ind] = ddg_mom[ind];
+	          ddg_mom_interlace_2[ind] = ddg_mom_interlace[ind];
+	        }
+	      }
+	    }
+
+        fftw_execute(plan_mom);
+        if (DoInterlacing) fftw_execute(plan_mom_interlace);
+      }
       assign_survey_power(0, 0, 0, 0);
     }
 
@@ -432,8 +533,25 @@ void compute_survey_power(void) {
           }
         }
 
-        fftw_execute(plan_2);
-        if (DoInterlacing) fftw_execute(plan_interlace_2);
+        fftw_execute(plan);
+        if (DoInterlacing) fftw_execute(plan_interlace);
+        if ((Momentum != 0) && (Momentum != 1)) {
+          for (int ix=0; ix<Local_nx; ix++) {
+	        for (int iy=0; iy<NY; iy++) {
+	          for (int iz=0; iz<NZ; iz++) {
+                long ind = iz+2*(NZ/2+1)*(iy+NY*ix);
+                double vec[3] = {(ix+Local_x_start)*dx+XMIN-X_Origin, iy*dy+YMIN-Y_Origin, iz*dz+ZMIN-Z_Origin};
+                double r2 = vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2];
+                if (r2 == 0.0) r2 = 1.0;
+                ddg_mom_2[ind] = ddg_mom[ind]*vec[ii]/sqrt(r2);
+                if (DoInterlacing) ddg_mom_interlace_2[ind] = ddg_mom_interlace[ind]*vec[ii]/sqrt(r2);
+	          }
+	        }
+	      }
+
+          fftw_execute(plan_mom);
+          if (DoInterlacing) fftw_execute(plan_mom_interlace);
+        }
         assign_survey_power(1, ii, 0, 0);
       }
     }
@@ -467,8 +585,26 @@ void compute_survey_power(void) {
             }
           }
 
-          fftw_execute(plan_2);
-          if (DoInterlacing) fftw_execute(plan_interlace_2);
+          fftw_execute(plan);
+          if (DoInterlacing) fftw_execute(plan_interlace);
+
+          if ((Momentum != 0) && (Momentum != 1)) {
+            for (int ix=0; ix<Local_nx; ix++) {
+	          for (int iy=0; iy<NY; iy++) {
+	            for (int iz=0; iz<NZ; iz++) {
+                  long ind = iz+2*(NZ/2+1)*(iy+NY*ix);
+                  double vec[3] = {(ix+Local_x_start)*dx+XMIN-X_Origin, iy*dy+YMIN-Y_Origin, iz*dz+ZMIN-Z_Origin};
+                  double r2 = vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2];
+                  if (r2 == 0.0) r2 = 1.0;
+                  ddg_mom_2[ind] = ddg_mom[ind]*vec[ii]*vec[jj]/r2;
+                  if (DoInterlacing) ddg_mom_interlace_2[ind] = ddg_mom_interlace[ind]*vec[ii]*vec[jj]/r2;
+	            }
+	          }
+	        }
+
+            fftw_execute(plan_mom);
+            if (DoInterlacing) fftw_execute(plan_mom_interlace);
+          }
           assign_survey_power(2, ii, jj, 0);
         }
       }
@@ -508,8 +644,26 @@ void compute_survey_power(void) {
               }
             }
 
-            fftw_execute(plan_2);
-            if (DoInterlacing) fftw_execute(plan_interlace_2);
+            fftw_execute(plan);
+            if (DoInterlacing) fftw_execute(plan_interlace);
+
+            if ((Momentum != 0) && (Momentum != 1)) {
+              for (int ix=0; ix<Local_nx; ix++) {
+	            for (int iy=0; iy<NY; iy++) {
+	              for (int iz=0; iz<NZ; iz++) {
+                    long ind = iz+2*(NZ/2+1)*(iy+NY*ix);
+                    double vec[3] = {(ix+Local_x_start)*dx+XMIN-X_Origin, iy*dy+YMIN-Y_Origin, iz*dz+ZMIN-Z_Origin};
+                    double r2 = vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2];
+                    if (r2 == 0.0) r2 = 1.0;
+                    ddg_mom_2[ind] = ddg_mom[ind]*vec[ii]*vec[jj]*vec[kk]/(r2*sqrt(r2));
+                    if (DoInterlacing) ddg_mom_interlace_2[ind] = ddg_mom_interlace[ind]*vec[ii]*vec[jj]*vec[kk]/(r2*sqrt(r2));
+	              }
+	            }
+	          }
+
+              fftw_execute(plan_mom);
+              if (DoInterlacing) fftw_execute(plan_mom_interlace);
+            }
             assign_survey_power(3, ii, jj, kk);
           }
         }
@@ -562,8 +716,27 @@ void compute_survey_power(void) {
               }
             }
 
-            fftw_execute(plan_2);
-            if (DoInterlacing) fftw_execute(plan_interlace_2);
+            fftw_execute(plan);
+            if (DoInterlacing) fftw_execute(plan_interlace);
+
+            if ((Momentum != 0) && (Momentum != 1)) {
+              for (int ix=0; ix<Local_nx; ix++) {
+	            for (int iy=0; iy<NY; iy++) {
+	              for (int iz=0; iz<NZ; iz++) {
+                    long ind = iz+2*(NZ/2+1)*(iy+NY*ix);
+                    double vec[3] = {(ix+Local_x_start)*dx+XMIN-X_Origin, iy*dy+YMIN-Y_Origin, iz*dz+ZMIN-Z_Origin};
+                    double r2 = vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2];
+                    if (r2 == 0.0) r2 = 1.0;
+                    ddg_mom_2[ind] = ddg_mom[ind]*vec[ii]*vec[ii]*vec[jj]*vec[kk]/(r2*r2);
+                    if (DoInterlacing) ddg_mom_interlace_2[ind] = ddg_mom_interlace[ind]*vec[ii]*vec[ii]*vec[jj]*vec[kk]/(r2*r2);
+	              }
+	            }
+	          }
+
+              fftw_execute(plan_mom);
+              if (DoInterlacing) fftw_execute(plan_mom_interlace);
+            }
+
             assign_survey_power(4, ii, jj, kk);
           }
         }
@@ -654,15 +827,44 @@ void assign_survey_power(int multipole, int ii, int jj, int kk) {
             dkr += dkr_interlace*cosk - dki_interlace*sink;
             dki += dkr_interlace*sink + dki_interlace*cosk;
           }
-          if (multipole == 0) {
-            F0[ind] = dkr;
-            F0[ind+1] = dki;
-            power = (dkr*dkr+dki*dki)*grid_cor;
-          } else if (multipole % 2) {
-            power = (dkr*F0[ind+1]-dki*F0[ind])*grid_cor;
-          } else {
-            power = (dkr*F0[ind]+dki*F0[ind+1])*grid_cor;
+          double dkr_mom, dki_mom;
+          if ((Momentum != 0) && (Momentum != 1)) {
+          	dkr_mom = ddg_mom_2[(2*k  )+2*(NZ/2+1)*(j+NY*(i-Local_x_start))];
+            dki_mom = ddg_mom_2[(2*k+1)+2*(NZ/2+1)*(j+NY*(i-Local_x_start))]; 
+            if (DoInterlacing) {
+              grid_cor *= 0.25;
+              double kh = ax+ay+az;
+              double sink = sin(kh);
+              double cosk = cos(kh);
+              double dkr_mom_interlace_2 = ddg_mom_interlace[(2*k  )+2*(NZ/2+1)*(j+NY*(i-Local_x_start))];
+              double dki_mom_interlace_2 = ddg_mom_interlace[(2*k+1)+2*(NZ/2+1)*(j+NY*(i-Local_x_start))]; 
+              dkr_mom += dkr_mom_interlace_2*cosk - dki_mom_interlace_2*sink;
+              dki_mom += dkr_mom_interlace_2*sink + dki_mom_interlace_2*cosk;
+            }
           }
+          if ((Momentum == 0) || (Momentum == 1)) {
+	        if (multipole == 0) {
+	          F0[ind] = dkr;
+	          F0[ind+1] = dki;
+	          power = (dkr*dkr+dki*dki)*grid_cor;
+	        } else if (multipole % 2) {
+	          power = (dkr*F0[ind+1]-dki*F0[ind])*grid_cor;
+	        } else {
+	          power = (dkr*F0[ind]+dki*F0[ind+1])*grid_cor;
+	        }
+	      } else {
+	        if (multipole == 0) {
+	          F0[ind] = dkr;
+	          F0[ind+1] = dki;
+	          F0_mom[ind] = dkr_mom;
+	          F0_mom[ind+1] = dki_mom;
+	          power = (dkr*dki_mom-dki*dkr_mom)*grid_cor;
+	        } else if (multipole % 2) {
+	          power = 0.5*(dkr*F0_mom[ind] + dki*F0_mom[ind+1] + dkr_mom*F0[ind] + dki_mom*F0_mom[ind+1])*grid_cor;
+	        } else {
+	          power = 0.5*(dkr*F0_mom[ind+1] - dki*F0_mom[ind] + dkr_mom*F0[ind+1] - dki_mom*F0[ind])*grid_cor;
+	        }
+	      }
 
           // This is necessary because we are only looping over half the grid in the z axis
           // so we need to fully account for the assumed hermitian symmetry in the data
@@ -777,7 +979,13 @@ void output_power(double shot, double norm) {
 
     FILE *fout, *fout_2D;
     char fout_name[2000], fout_name_2D[2000];
-    sprintf(fout_name, "%s/%s.lpow", OutputDir, FileBase);
+    if (Momentum == 0) {
+      sprintf(fout_name, "%s/%s.lpow", OutputDir, FileBase);
+    } else if (Momentum == 1) {
+      sprintf(fout_name, "%s/%s.lmom", OutputDir, FileBase);
+    } else {
+      sprintf(fout_name, "%s/%s.lcross", OutputDir, FileBase);
+    }
     if (ThisTask == 0) {
       if((fout=fopen(fout_name,"w"))==NULL) { printf("cannot open output file: %s\n", fout_name); FatalError("read_data", 142); }
       printf("Writing multipoles to file: %s\n",fout_name);
@@ -952,22 +1160,33 @@ void create_grids(void) {
 
   // Allocate the grids and create the FFTW plan
   ddg = (double*)calloc(Total_size,sizeof(double));
+  if ((Momentum != 0) && (Momentum != 1)) ddg_mom = (double*)calloc(Total_size,sizeof(double));
   if (Periodic) {
     plan = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg,(fftw_complex*)ddg,MPI_COMM_WORLD,FFTW_ESTIMATE); 
+    if ((Momentum != 0) && (Momentum != 1)) plan_mom = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_mom,(fftw_complex*)ddg_mom,MPI_COMM_WORLD,FFTW_ESTIMATE); 
   } else if (Survey) {
     ddg_2 = (double*)calloc(Total_size,sizeof(double));
-    plan = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg,(fftw_complex*)ddg_2,MPI_COMM_WORLD,FFTW_ESTIMATE); 
-    plan_2 = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_2,(fftw_complex*)ddg_2,MPI_COMM_WORLD,FFTW_ESTIMATE); 
+    plan = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_2,(fftw_complex*)ddg_2,MPI_COMM_WORLD,FFTW_ESTIMATE); 
     F0 = (double*)malloc(Total_size*sizeof(double));
+    if ((Momentum != 0) && (Momentum != 1)) {
+      ddg_mom_2 = (double*)calloc(Total_size,sizeof(double));
+      plan_mom = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_mom_2,(fftw_complex*)ddg_mom_2,MPI_COMM_WORLD,FFTW_ESTIMATE); 
+      F0_mom = (double*)malloc(Total_size*sizeof(double));
+    }
   }
   if (DoInterlacing) {
     ddg_interlace = (double*)calloc(Total_size,sizeof(double));
+    if ((Momentum != 0) && (Momentum != 1)) ddg_mom_interlace = (double*)calloc(Total_size,sizeof(double));
     if (Periodic) {
       plan_interlace = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_interlace,(fftw_complex*)ddg_interlace,MPI_COMM_WORLD,FFTW_ESTIMATE);   
+      if ((Momentum != 0) && (Momentum != 1)) plan_mom_interlace = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_mom,(fftw_complex*)ddg_mom,MPI_COMM_WORLD,FFTW_ESTIMATE); 
     } else if (Survey) {
       ddg_interlace_2 = (double*)calloc(Total_size,sizeof(double));
-      plan_interlace = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_interlace,(fftw_complex*)ddg_interlace_2,MPI_COMM_WORLD,FFTW_ESTIMATE);   
-      plan_interlace_2 = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_interlace_2,(fftw_complex*)ddg_interlace_2,MPI_COMM_WORLD,FFTW_ESTIMATE);   
+      plan_interlace = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_interlace_2,(fftw_complex*)ddg_interlace_2,MPI_COMM_WORLD,FFTW_ESTIMATE);   
+      if ((Momentum != 0) && (Momentum != 1)) {
+    	ddg_mom_interlace_2 = (double*)calloc(Total_size,sizeof(double));
+    	plan_mom_interlace = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_mom_interlace_2,(fftw_complex*)ddg_mom_interlace_2,MPI_COMM_WORLD,FFTW_ESTIMATE); 
+      }
     }
   }
 
@@ -1001,17 +1220,31 @@ void create_grids(void) {
 void destroy_grids(void) {
   fftw_destroy_plan(plan);
   free(ddg);
+  if ((Momentum != 0) && (Momentum != 1)) {
+  	fftw_destroy_plan(plan_mom);
+  	free(ddg_mom);
+  }
   if (Survey) {
-    fftw_destroy_plan(plan_2);
     free(ddg_2);
     free(F0);
+    if ((Momentum != 0) && (Momentum != 1)) {
+      free(ddg_mom_2);
+      free(F0_mom);
+    }
   }
   if (DoInterlacing) {
     fftw_destroy_plan(plan_interlace);
     free(ddg_interlace);
+    if ((Momentum != 0) && (Momentum != 1)) {
+  	  fftw_destroy_plan(plan_mom_interlace);
+  	  free(ddg_mom_interlace);
+    }
     if (Survey) {
-      fftw_destroy_plan(plan_interlace_2);
+      fftw_destroy_plan(plan_interlace);
       free(ddg_interlace_2);
+      if ((Momentum != 0) && (Momentum != 1)) {
+        free(ddg_mom_interlace_2);
+      }
     }
   }
   free(Pk0);

@@ -34,7 +34,7 @@ double read_periodic_serial_ascii(void) {
   FILE * fp;
   int bufsize = 2000;
   char buf[bufsize], inputfile[bufsize];
-  double NREAD = 0, NGRID = 0;
+  double NREAD = 0, NGRID = 0, NPV = 0;
   double XMIN_LOCAL = Local_x_start*dx+XMIN;
   double XMAX_LOCAL = (Local_x_start+Local_nx)*dx+XMIN;
   sprintf(inputfile, "%s/%s", InputDir, FileBase);
@@ -42,6 +42,10 @@ double read_periodic_serial_ascii(void) {
   if (ThisTask == 0) {
     printf("\nReading: %s\n", inputfile); 
     fflush(stdout);
+  }
+
+  if (Momentum) {
+    nsq = 0.0; vr_ave = 0.0; vrsq_ave = 0.0;
   }
 
   // Open the file
@@ -59,7 +63,7 @@ double read_periodic_serial_ascii(void) {
     //if(sscanf(buf,"%lf %lf %lf %lf\n",&tx,&ty,&tz,&tz_rsd)!=4) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
     //tz = tz_rsd;
     if(sscanf(buf,"%lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tvx,&tvy,&tvz)!=6) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
-
+    double tvr = tvz;
 
     NREAD += w;
     if ((tx < XMIN) || (tx > XMAX) || (ty < YMIN) || (ty > YMAX) || (tz < ZMIN) || (tz > ZMAX)) {
@@ -67,8 +71,23 @@ double read_periodic_serial_ascii(void) {
       FatalError("read_data", 110);
     }
 
-    NGRID += add_to_grid(tx, ty, tz, w, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
-    if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+    if (Momentum == 1) {
+      NGRID += add_to_grid(tx, ty, tz, w*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+    } else {
+      NGRID += add_to_grid(tx, ty, tz, w, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+      if (Momentum != 0) {
+        NPV += add_to_grid(tx, ty, tz, w*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom);
+        if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom_interlace);
+      }
+    }
+
+    if (Momentum) {
+      nsq += w*w;
+      vr_ave += w*tvr;
+      vrsq_ave += w*w*tvr*tvr;
+    }
 
   }
   printf("Task %d read %lf particles, gridded %lf\n", ThisTask, NREAD, NGRID);
@@ -87,6 +106,18 @@ double read_periodic_serial_ascii(void) {
       for (int i=0;i<InterpOrder*alloc_slice;i++) ddg_interlace[i] += temp_ddg[i];
     }
     free(temp_ddg);
+    if ((Momentum != 0) && (Momentum != 1)) {
+      double * temp_ddg = (double *)calloc(InterpOrder*alloc_slice,sizeof(double));
+      ierr = MPI_Sendrecv(&(ddg_mom[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
+                          &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
+      for (int i=0;i<InterpOrder*alloc_slice;i++) ddg_mom[i] += temp_ddg[i];
+      if (DoInterlacing) {
+        ierr = MPI_Sendrecv(&(ddg_mom_interlace[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
+                            &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
+        for (int i=0;i<InterpOrder*alloc_slice;i++) ddg_mom_interlace[i] += temp_ddg[i];
+      }
+      free(temp_ddg);
+    }
   }
 
   return NGRID;
@@ -96,7 +127,7 @@ double read_periodic_serial_ascii(void) {
 // Read in an ASCII file containing the survey data.
 // Every processor reads in the file but only stores the relevant parts.
 // =====================================================================
-double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata) {
+double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata, int randoms) {
 
   FILE * fp;
   int bufsize = 2000;
@@ -125,6 +156,14 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
   // Open the file
   if((fp=fopen(inputfile,"r"))==NULL) { printf("Task %d cannot open input file\n", ThisTask);  FatalError("read_data", 113); }
 
+  // Skip over lines starting with #
+  while(fgets(largebuf,largebufsize,fp)) {
+    if(strncmp(largebuf,"#",1)!=0) break;
+  }
+
+  // Move back to the start of the line
+  fseek(fp, -strlen(largebuf), SEEK_CUR);
+
   // Loop over each line and store the data coordinates
   // The exact format may need modifying
   int nleft=0;
@@ -137,12 +176,22 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
 
     //printf("%s\n", largebuf);
 
-    double tx, ty, tz, tred, tnbar, tw;
+    int tid, tcen;
+    double tx, ty, tz, tred, tnbar, tmass, tw;
+    double tlogdist, tlogdist_true, tlogdist_err;
 
     char * buf = strtok(largebuf, "\n");
     unsigned long largelen = strlen(buf)+1;
     while(largelen <= nbuf+nleft) {
-      if(sscanf(buf,"%lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tred,&tnbar)!=5) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+      if (randoms) {
+        if(sscanf(buf,"%lf %lf %lf %lf\n",&tx,&ty,&tz,&tnbar)!=4) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+        tz /= LightSpeed;
+        tw = 1.0;
+      } else {
+        if(sscanf(buf,"%d %lf %lf %lf %lf %lf %lf %lf\n",&tid,&tx,&ty,&tz,&tlogdist_true,&tlogdist,&tlogdist_err,&tnbar)!=8) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+        tz /= LightSpeed;
+        tw = 1.0;
+      }
       NREAD++;
       
       if (ThisTask == 0) {
@@ -151,6 +200,8 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
           fflush(stdout);
         }
       }
+
+      //printf("%d, %lf, %lf, %lf, %lf, %lf, %lf, %lf\n",tid,tx,ty,tz,tlogdist_true,tlogdist,tlogdist_err,tnbar);
 
       if (Coord_Type == 0) {
         tred = gsl_spline_eval(red_spline, sqrt(tx*tx + ty*ty + tz*tz), red_acc);
@@ -161,6 +212,7 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
           continue;
         }
       } else {
+        tred = tz;
         if ((tred < REDMININ) || (tred > REDMAXIN)) {
           buf = strtok(NULL, "\n");
           if (buf == NULL) break;
@@ -177,6 +229,7 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
         tx = dist*cos(dec)*cos(ra);
         ty = dist*cos(dec)*sin(ra);
         tz = dist*sin(dec);
+        if (Momentum && randoms) tlogdist_err = 0.177*100.0*dist;
       }
 
       // Check the data can fit in the grid including whatever interpolation order we are using
@@ -190,8 +243,16 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata)
       inputdata[NKEEP].coord[1] = ty;
       inputdata[NKEEP].coord[2] = tz;
       inputdata[NKEEP].redshift = tred;
+      inputdata[NKEEP].weight = tw;
       if (NBAR_Column > 0) inputdata[NKEEP].nbar = tnbar;
-      if (FKP_Column > 0) inputdata[NKEEP].weight = tw;
+      if (Momentum) {
+        inputdata[NKEEP].pv = log(10.0)*LightSpeed*tred*tlogdist/(1.0+tred);
+        if (randoms) {
+          inputdata[NKEEP].pverr = tlogdist_err;
+        } else {
+          inputdata[NKEEP].pverr = log(10.0)*LightSpeed*tred*tlogdist_err/(1.0+tred);
+        }
+      }
       NKEEP++;
 
       if (tred < REDMIN) REDMIN = tred;
@@ -308,7 +369,9 @@ void compute_nbar(int parallel, unsigned long long NDATA, unsigned long long NRA
 
   // Assign the number density to each data and random point
   for (unsigned long long i=0; i<NDATA; i++) data[i].nbar = gsl_spline_eval(nbar_spline, data[i].redshift, nbar_acc);
-  for (unsigned long long i=0; i<NRAND; i++) randoms[i].nbar = gsl_spline_eval(nbar_spline, randoms[i].redshift, nbar_acc);
+  if (Momentum == 0) {
+    for (unsigned long long i=0; i<NRAND; i++) randoms[i].nbar = gsl_spline_eval(nbar_spline, randoms[i].redshift, nbar_acc);
+  }
 
   free(znbar);
   free(nbar);
@@ -321,7 +384,21 @@ void compute_nbar(int parallel, unsigned long long NDATA, unsigned long long NRA
 // Compute the FKP weights for each object
 // =======================================
 void compute_fkp(unsigned long long NOBJ, struct survey_data * inputdata) {
-  for (unsigned long long i=0; i<NOBJ; i++) inputdata[i].weight = 1.0/(1.0+inputdata[i].nbar*FKP_Pk);
+  for (unsigned long long i=0; i<NOBJ; i++) {
+    if (Momentum == 0) {
+      inputdata[i].weight *= 1.0/(1.0+inputdata[i].nbar*FKP_Pk);
+    } else if (Momentum == 1) {
+      //printf("%lf, %lf, %lf\n", inputdata[i].pverr, inputdata[i].nbar, FKP_Pk_mom);
+      inputdata[i].weight *= 1.0/((inputdata[i].pverr*inputdata[i].pverr+300.0*300.0)+inputdata[i].nbar*FKP_Pk_mom);
+    } else {
+      double temp_weight = 1.0/(1.0+inputdata[i].nbar*FKP_Pk);
+      double temp_weight_pv = 1.0/((inputdata[i].pverr*inputdata[i].pverr+300.0*300.0)+inputdata[i].nbar*FKP_Pk_mom);
+      double temp_weight_cross = 1.0/sqrt(1.0 + temp_weight*temp_weight_pv*inputdata[i].nbar*inputdata[i].nbar*FKP_Pk_cross*FKP_Pk_cross);
+      inputdata[i].weight = temp_weight*temp_weight_cross;
+      inputdata[i].weight_pv = temp_weight_pv*temp_weight_cross;
+      //printf("%g, %g, %g\n", temp_weight_pv, inputdata[i].weight, inputdata[i].weight_pv);
+    }
+  }
   return;
 }
 
@@ -335,8 +412,17 @@ double assign_survey_data(unsigned long long NOBJ, struct survey_data * inputdat
   double XMAX_LOCAL = (Local_x_start+Local_nx)*dx+XMIN;
 
   for (unsigned long long i=0; i<NOBJ; i++) {
-    NGRID += add_to_grid(inputdata[i].coord[0], inputdata[i].coord[1], inputdata[i].coord[2], prefactor*inputdata[i].weight, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
-    if (DoInterlacing) add_to_grid(inputdata[i].coord[0]+dx/2.0, inputdata[i].coord[1]+dy/2.0, inputdata[i].coord[2]+dz/2.0, prefactor*inputdata[i].weight, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+    if (Momentum == 1) {
+      NGRID += add_to_grid(inputdata[i].coord[0], inputdata[i].coord[1], inputdata[i].coord[2], prefactor*inputdata[i].pv*inputdata[i].weight, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg)/(inputdata[i].pv*inputdata[i].weight);
+      if (DoInterlacing) add_to_grid(inputdata[i].coord[0]+dx/2.0, inputdata[i].coord[1]+dy/2.0, inputdata[i].coord[2]+dz/2.0, prefactor*inputdata[i].pv*inputdata[i].weight, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+    } else {
+      NGRID += add_to_grid(inputdata[i].coord[0], inputdata[i].coord[1], inputdata[i].coord[2], prefactor*inputdata[i].weight, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg)/inputdata[i].weight;
+      if (DoInterlacing) add_to_grid(inputdata[i].coord[0]+dx/2.0, inputdata[i].coord[1]+dy/2.0, inputdata[i].coord[2]+dz/2.0, prefactor*inputdata[i].weight, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+      if (Momentum) {
+        add_to_grid(inputdata[i].coord[0], inputdata[i].coord[1], inputdata[i].coord[2], prefactor*inputdata[i].pv*inputdata[i].weight_pv, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom);
+        if (DoInterlacing) add_to_grid(inputdata[i].coord[0]+dx/2.0, inputdata[i].coord[1]+dy/2.0, inputdata[i].coord[2]+dz/2.0, prefactor*inputdata[i].pv*inputdata[i].weight_pv, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom_interlace);  
+      }
+    }
   }
   printf("Task %d has %llu objects, gridded %lf\n", ThisTask, NOBJ, NGRID/prefactor);
   fflush(stdout);

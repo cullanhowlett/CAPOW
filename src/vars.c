@@ -35,19 +35,22 @@ MPI_Status status;    // The MPI error status
 // Global variables for the grids
 int * Slab_to_task;         // The task to which each slice is assigned
 int * Local_nx_table;       // The number of slices on each of the tasks
-double * F0;                // Density grid for storing fourier transformed monopole
+double * F0, * F0_mom;                // Density grid for storing fourier transformed monopole
 double * ddg, * ddg_2;      // The density grids for storing data
 double * ddg_interlace;     // Extra density grids for interlacing
 double * ddg_interlace_2;   // Extra density grids for interlacing
+double * ddg_mom, * ddg_mom_2;      // The density grids for storing data
+double * ddg_mom_interlace;     // Extra density grids for interlacing
+double * ddg_mom_interlace_2;   // Extra density grids for interlacing
 ptrdiff_t Local_nx;         // The number of slices on the task
 ptrdiff_t last_slice;       // The last slice of the density/force grids (maybe equal to alloc_local)
 ptrdiff_t Total_size;       // The total byte-size of the grids on each processor
 ptrdiff_t Local_nxtra;      // The number of slices on the task accounting for buffer required for interlacing/interpolation
 ptrdiff_t alloc_slice;      // The byte-size of a slice of the density/force grids
 ptrdiff_t Local_x_start;    // The global start of the slices on the task
-fftw_plan plan, plan_2;     // The plans for the in-place FFT of the density grid
+fftw_plan plan, plan_mom;     // The plans for the in-place FFT of the density grid
 fftw_plan plan_interlace;   // The plans for the in-place FFT of the density grid
-fftw_plan plan_interlace_2; // The plans for the in-place FFT of the density grid
+fftw_plan plan_mom_interlace; // The plans for the in-place FFT of the density grid
 
 // Parameters for input and output files
 char FileBase[500];      // The base input filename
@@ -91,6 +94,7 @@ int Periodic; // Tell the code this is data from a periodic simulation (this or 
 
 // Parameters for survey data
 int Survey;        // Tell the code this is data from a periodic simulation (this or Periodic must be set to 1)
+int Momentum;       // Whether or not to compute the momentum auto/cross power spectra (0 == density, 1 == momentum, otherwise == cross)
 int NOBJ_Max;      // The maximum number of objects to read in (of any single type type, data or randoms, for allocating space)
 int x_Column;      // The column in the input file containing the x coordinates or RA values
 int y_Column;      // The column in the input file containing the y coordinates or Dec values
@@ -101,6 +105,8 @@ int NBAR_Column;   // The column in the input file containing the nbar values. S
 int Odd_Multipoles; // Flag to tell the code whether or not to compute the odd-order multipoles
 double SkyArea;    // The effective solid angle area of the survey in square degrees (if necessary)
 double FKP_Pk;     // The value to use for computing the FKP weights (if necessary)  
+double FKP_Pk_mom;     // The value to use for computing the FKP weights (if necessary)
+double FKP_Pk_cross;     // The value to use for computing the FKP weights (if necessary)
 double REDMIN;     // The minimum redshift of the data (used for computing the nbar)    
 double REDMAX;     // The maximum redshift of the data (used for computing the nbar) 
 double REDMININ;       // The minimum redshift to include in the input
@@ -108,6 +114,7 @@ double REDMAXIN;       // The maximum redshift to include in the input
 double X_Origin;   // The coodinate of the observer in the box in the x-direction
 double Y_Origin;   // The coodinate of the observer in the box in the y-direction
 double Z_Origin;   // The coodinate of the observer in the box in the z-direction
+double nsq, vr_ave, vrsq_ave; // Variables needed for momentum power spectra 
 
 struct survey_data * data, * randoms;  // Structures for survey data
 

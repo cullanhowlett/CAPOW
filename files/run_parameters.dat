@@ -45,6 +45,7 @@ LOS        3       % The axis to treat as the line-of-sight (1 = x, 2 = y, 3 = z
 % Parameters for survey data
 % ==========================
 Survey         1       % Tell the code this is data from a periodic simulation (this or Periodic must be set to 1)
+Momentum       1       % Whether to compute the density (0) or momentum (1) power spectrum
 X_Origin       0       % The location of the observer in the x-direction
 Y_Origin       0       % The location of the observer in the y-direction
 Z_Origin       0       % The location of the observer in the z-direction
@@ -58,6 +59,8 @@ z_Column       4       % The column in the input file containing the z coordinat
 NBAR_Column   -1	   % The column in the input file containing the nbar values. Set to -1 to compute these internally using SkyArea value
 SkyArea      10313.24  % The effective solid angle area of the survey in square degrees (if necessary)
 FKP_Column    -1	   % The column in the input file containing the FKP weights. Set to -1 to compute these internally using FKP_Pk value
-FKP_Pk       0.0       % The value to use for computing the FKP weights (if necessary)     
+FKP_Pk         0.0       % The value to use for computing the FKP weights (if necessary)  
+FKP_Pk_mom     5e9       % The value to use for computing the FKP weights (if necessary)     
+FKP_Pk_cross   2e6       % The value to use for computing the FKP weights (if necessary)    
 Odd_Multipoles 1       % Whether or not to compute the odd-order multipoles (1 = Yes, 0 = No)
 
