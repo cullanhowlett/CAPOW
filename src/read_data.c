@@ -29,15 +29,14 @@
 // Read in an ASCII file containing the simulation box data. 
 // Every processor reads in the file but only stores the relevant parts.
 // =====================================================================
-double read_periodic_serial_ascii(void) {
+double read_periodic_serial_ascii(char *inputfile) {
 
   FILE * fp;
   int bufsize = 2000;
-  char buf[bufsize], inputfile[bufsize];
+  char buf[bufsize];
   double NREAD = 0, NGRID = 0, NPV = 0;
   double XMIN_LOCAL = Local_x_start*dx+XMIN;
   double XMAX_LOCAL = (Local_x_start+Local_nx)*dx+XMIN;
-  sprintf(inputfile, "%s/%s", InputDir, FileBase);
 
   if (ThisTask == 0) {
     printf("\nReading: %s\n", inputfile); 

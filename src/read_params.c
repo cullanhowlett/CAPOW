@@ -46,21 +46,21 @@ void read_parameterfile(char * fname) {
 
   nt = 0;
 
-  strcpy(tag[nt], "InputDir");
-  addr[nt] = InputDir;
-  id[nt++] = STRING;
+  //strcpy(tag[nt], "InputDir");
+  //addr[nt] = InputDir;
+  //id[nt++] = STRING;
 
-  strcpy(tag[nt], "OutputDir");
-  addr[nt] = OutputDir;
-  id[nt++] = STRING;
+  //strcpy(tag[nt], "OutputDir");
+  //addr[nt] = OutputDir;
+  //id[nt++] = STRING;
 
-  strcpy(tag[nt], "FileBase");
-  addr[nt] = FileBase;
-  id[nt++] = STRING;
+  //strcpy(tag[nt], "FileBase");
+  //addr[nt] = FileBase;
+  //id[nt++] = STRING;
 
-  strcpy(tag[nt], "RandFileBase");
-  addr[nt] = RandFileBase;
-  id[nt++] = STRING;
+  //strcpy(tag[nt], "RandFileBase");
+  //addr[nt] = RandFileBase;
+  //id[nt++] = STRING;
 
   strcpy(tag[nt], "NumFilesInParallel");
   addr[nt] = &NumFilesInParallel;

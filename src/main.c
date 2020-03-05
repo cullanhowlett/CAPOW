@@ -27,6 +27,8 @@
 
 int main(int argc, char **argv) {
 
+  char datafile[2000], randfile[2000], outfile[2000];
+
   // Set up MPI
   // ==========
   ierr = MPI_Init(&argc, &argv);
@@ -34,10 +36,10 @@ int main(int argc, char **argv) {
   ierr = MPI_Comm_size(MPI_COMM_WORLD, &NTask);
   fftw_mpi_init();
 
-  if(argc < 2) {
+  if(argc < 5) {
     if(ThisTask == 0) {
       fprintf(stdout, "Input parameters not found\n");
-      fprintf(stdout, "Call with <ParameterFile>\n");
+      fprintf(stdout, "Call with <ParameterFile, DataFile, RandomFile, OutputFile>\n");
       fflush(stdout);
     }
     ierr = MPI_Finalize();
@@ -52,6 +54,9 @@ int main(int argc, char **argv) {
     fflush(stdout);
   }
   read_parameterfile(argv[1]);
+  sprintf(datafile, "%s", argv[2]);
+  sprintf(randfile, "%s", argv[3]);
+  sprintf(outfile, "%s", argv[4]);
 
   if (ThisTask == 0) {
     printf("\nAllocating grid\n"); 
@@ -68,16 +73,15 @@ int main(int argc, char **argv) {
   double NPERIODIC;
   unsigned long long NDATA, NRAND;
   if (Periodic) {
-    NPERIODIC = read_periodic_serial_ascii();
+    NPERIODIC = read_periodic_serial_ascii(datafile);
   } else if (Survey) {
-    char datafile[2000], randfile[2000];
     REDMIN = 1.0e30, REDMAX = -1.0e30;
     if(!(data = (struct survey_data *) malloc(NOBJ_Max*sizeof(struct survey_data)))) { printf("Task %d unable to allocate memory for data\n", ThisTask);  FatalError("main", 72); }
-    sprintf(datafile, "%s/%s", InputDir, FileBase);
+    //sprintf(datafile, "%s/%s", InputDir, FileBase);
     NDATA = read_survey_serial_ascii(datafile, data, 0);
     if (Momentum != 1) {
       if(!(randoms = (struct survey_data *) malloc(NOBJ_Max*sizeof(struct survey_data)))) { printf("Task %d unable to allocate memory for randoms\n", ThisTask);  FatalError("main", 72); }
-      sprintf(randfile, "%s/%s", InputDir, RandFileBase);
+      //sprintf(randfile, "%s/%s", InputDir, RandFileBase);
       NRAND = read_survey_serial_ascii(randfile, randoms, 1);
     }
     if (NBAR_Column < 0) compute_nbar(0, NDATA, NRAND);
@@ -267,7 +271,7 @@ int main(int argc, char **argv) {
     printf("========================\n");
     fflush(stdout);
   }
-  output_power(shot, norm);
+  output_power(shot, norm, outfile);
 
   if (ThisTask == 0) {
     printf("\nCleaning up\n"); 
@@ -941,7 +945,7 @@ void assign_survey_power(int multipole, int ii, int jj, int kk) {
 
 // Output the power spectrum
 // =========================
-void output_power(double shot, double norm) {
+void output_power(double shot, double norm, char* fout_name) {
 
   // Sum the power and number of modes over all processors.
   int * Nmodes_glob, * Nmodes_2D_glob;
@@ -978,25 +982,16 @@ void output_power(double shot, double norm) {
   if (ThisTask == 0) {
 
     FILE *fout, *fout_2D;
-    char fout_name[2000], fout_name_2D[2000];
-    if (Momentum == 0) {
-      sprintf(fout_name, "%s/%s.lpow", OutputDir, FileBase);
-    } else if (Momentum == 1) {
-      sprintf(fout_name, "%s/%s.lmom", OutputDir, FileBase);
-    } else {
-      sprintf(fout_name, "%s/%s.lcross", OutputDir, FileBase);
-    }
-    if (ThisTask == 0) {
-      if((fout=fopen(fout_name,"w"))==NULL) { printf("cannot open output file: %s\n", fout_name); FatalError("read_data", 142); }
-      printf("Writing multipoles to file: %s\n",fout_name);
-      fflush(stdout);
-      if (Output2D) {
-        sprintf(fout_name_2D, "%s_2D", fout_name);
-        if((fout_2D=fopen(fout_name_2D,"w"))==NULL) { printf("cannot open output file: %s\n", fout_name_2D); FatalError("read_data", 142); }
-        printf("Writing 2D power spectrum to file:%s\n",fout_name_2D);
-        fflush(stdout);
-      }
-    }
+    char fout_name_2D[2000];
+	if((fout=fopen(fout_name,"w"))==NULL) { printf("cannot open output file: %s\n", fout_name); FatalError("read_data", 142); }
+	printf("Writing multipoles to file: %s\n",fout_name);
+	fflush(stdout);
+	if (Output2D) {
+	  sprintf(fout_name_2D, "%s_2D", fout_name);
+	  if((fout_2D=fopen(fout_name_2D,"w"))==NULL) { printf("cannot open output file: %s\n", fout_name_2D); FatalError("read_data", 142); }
+	  printf("Writing 2D power spectrum to file:%s\n",fout_name_2D);
+	  fflush(stdout);
+	}
 
     // Normalise and apply shot noise correction
     int * Pkfill = (int*)calloc(NK, sizeof(int));
