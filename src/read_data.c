@@ -387,14 +387,13 @@ void compute_fkp(unsigned long long NOBJ, struct survey_data * inputdata) {
     if (Momentum == 0) {
       inputdata[i].weight *= 1.0/(1.0+inputdata[i].nbar*FKP_Pk);
     } else if (Momentum == 1) {
-      //printf("%lf, %lf, %lf\n", inputdata[i].pverr, inputdata[i].nbar, FKP_Pk_mom);
       inputdata[i].weight *= 1.0/((inputdata[i].pverr*inputdata[i].pverr+300.0*300.0)+inputdata[i].nbar*FKP_Pk_mom);
     } else {
       double temp_weight = 1.0/(1.0+inputdata[i].nbar*FKP_Pk);
       double temp_weight_pv = 1.0/((inputdata[i].pverr*inputdata[i].pverr+300.0*300.0)+inputdata[i].nbar*FKP_Pk_mom);
       double temp_weight_cross = 1.0/sqrt(1.0 + temp_weight*temp_weight_pv*inputdata[i].nbar*inputdata[i].nbar*FKP_Pk_cross*FKP_Pk_cross);
-      inputdata[i].weight = temp_weight*temp_weight_cross;
-      inputdata[i].weight_pv = temp_weight_pv*temp_weight_cross;
+      inputdata[i].weight_pv = inputdata[i].weight*temp_weight_pv*temp_weight_cross;
+      inputdata[i].weight *= temp_weight*temp_weight_cross;
       //printf("%g, %g, %g\n", temp_weight_pv, inputdata[i].weight, inputdata[i].weight_pv);
     }
   }

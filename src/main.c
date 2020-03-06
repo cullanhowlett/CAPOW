@@ -130,23 +130,17 @@ int main(int argc, char **argv) {
       fflush(stdout);
     }
   } else if (Survey) {
-    double data_nbw = 0.0, data_nbwsq = 0.0, data_nbsqwsq = 0.0, data_vr = 0.0, data_vrsq = 0.0; 
+    double data_nbw = 0.0, data_nbwsq = 0.0, data_nbsqwsq = 0.0, data_nbsqwsq_pv = 0.0, data_vr = 0.0, data_vrsq = 0.0; 
     double rand_nbw = 0.0, rand_nbwsq = 0.0, rand_nbsqwsq = 0.0;
     for (unsigned long long i=0;i<NDATA;i++) {
-      if ((Momentum == 0) || (Momentum == 1)) {
-        data_nbw     += data[i].weight;
-        data_nbwsq   += data[i].weight*data[i].weight;
-        data_nbsqwsq += data[i].weight*data[i].weight*data[i].nbar;
-        if (Momentum) {
-      	  data_vr += data[i].weight*data[i].weight*data[i].pv;
-      	  data_vrsq += data[i].weight*data[i].weight*data[i].pv*data[i].pv;
-        }
-      } else {
-        data_nbw     += data[i].weight;
-        data_nbwsq   += data[i].weight*data[i].weight_pv;
-        data_nbsqwsq += data[i].weight*data[i].weight_pv*data[i].nbar;
-      	data_vr += data[i].weight*data[i].weight_pv*data[i].pv;
-      	data_vrsq += data[i].weight*data[i].weight_pv*data[i].pv*data[i].pv;	
+      data_nbw     += data[i].weight;
+      data_nbwsq   += data[i].weight*data[i].weight;
+      data_nbsqwsq += data[i].weight*data[i].weight*data[i].nbar;
+      if (Momentum == 1) {
+        data_vrsq += data[i].weight*data[i].weight*data[i].pv*data[i].pv;
+      } else if (Momentum != 0) {
+        data_vr += data[i].weight*data[i].weight_pv*data[i].pv;
+        data_nbsqwsq_pv += data[i].weight_pv*data[i].weight_pv*data[i].nbar;
       }
     }
     if (Momentum == 0) {
@@ -156,11 +150,7 @@ int main(int argc, char **argv) {
         rand_nbsqwsq += randoms[i].weight*randoms[i].weight*randoms[i].nbar;
       }
     } else if (Momentum == 2) {
-      for (unsigned long long i=0;i<NRAND;i++) {
-        rand_nbw     += randoms[i].weight;
-        rand_nbwsq   += randoms[i].weight*randoms[i].weight_pv;
-        rand_nbsqwsq += randoms[i].weight*randoms[i].weight_pv*randoms[i].nbar;
-      }
+      for (unsigned long long i=0;i<NRAND;i++) rand_nbw     += randoms[i].weight;
     }
 
     alpha = data_nbw/rand_nbw;
@@ -175,17 +165,22 @@ int main(int argc, char **argv) {
       norm = data_nbsqwsq;
     } else {
       shot = data_vr;
-      norm = data_nbsqwsq;
+      norm = sqrt(data_nbsqwsq*data_nbsqwsq_pv);
     }
 
     if (ThisTask == 0) {
-      printf("alpha = %g\n",alpha);
-      printf("shot-noise [data, randoms]    = %g, %g\n",data_nbwsq, rand_nbwsq);
-      printf("normalisation [data, randoms] = %g, %g\n",data_nbsqwsq, rand_nbsqwsq);
-      if (Momentum) {
-      	printf("# vr_zero   = %g\n",data_vr);
-        printf("# vrsq_zero   = %g\n",data_vrsq);
-      }
+      if (Momentum == 0) {
+	    printf("alpha = %g\n",alpha);
+		printf("shot-noise [data, randoms]    = %g, %g\n",data_nbwsq, rand_nbwsq);
+		printf("normalisation [data, randoms] = %g, %g\n",data_nbsqwsq, rand_nbsqwsq);
+	  } else if (Momentum == 1) {
+		printf("shot-noise    = %g\n",data_vrsq);
+		printf("normalisation = %g\n",data_nbsqwsq);
+	  } else {
+	  	printf("alpha = %g\n",alpha);
+	  	printf("shot-noise    = %g\n",data_vr);
+		printf("normalisation = %g\n",norm);
+	  }
       fflush(stdout);
     }
   }
