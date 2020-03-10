@@ -222,7 +222,7 @@ int main(int argc, char **argv) {
       }
       free(temp_ddg);
     }
-    /*if ((Momentum != 0) && (Momentum != 1)) {
+    if ((Momentum != 0) && (Momentum != 1)) {
       if (InterpOrder > 1) {
         double * temp_ddg = (double *)malloc(InterpOrder*alloc_slice*sizeof(double));
         ierr = MPI_Sendrecv(&(ddg_mom[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
@@ -235,7 +235,7 @@ int main(int argc, char **argv) {
         }
         free(temp_ddg);
       }
-    }*/
+    }
   }
 
   if (Periodic) {
