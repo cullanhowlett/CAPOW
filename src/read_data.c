@@ -368,7 +368,7 @@ void compute_nbar(int parallel, unsigned long long NDATA, unsigned long long NRA
 
   // Assign the number density to each data and random point
   for (unsigned long long i=0; i<NDATA; i++) data[i].nbar = gsl_spline_eval(nbar_spline, data[i].redshift, nbar_acc);
-  if (Momentum == 0) {
+  if (Momentum != 1) {
     for (unsigned long long i=0; i<NRAND; i++) randoms[i].nbar = gsl_spline_eval(nbar_spline, randoms[i].redshift, nbar_acc);
   }
 
@@ -403,7 +403,7 @@ void compute_fkp(unsigned long long NOBJ, struct survey_data * inputdata) {
 // Assign survey data to a grid. The third argument is the factor to multiply
 // each assignment by which allows the function to be used for both data and randoms.
 // ==================================================================================
-double assign_survey_data(unsigned long long NOBJ, struct survey_data * inputdata, double prefactor) {
+double assign_survey_data(unsigned long long NOBJ, struct survey_data * inputdata, double prefactor, int data) {
 
   double NGRID = 0;
   double XMIN_LOCAL = Local_x_start*dx+XMIN;
@@ -416,7 +416,7 @@ double assign_survey_data(unsigned long long NOBJ, struct survey_data * inputdat
     } else {
       NGRID += add_to_grid(inputdata[i].coord[0], inputdata[i].coord[1], inputdata[i].coord[2], prefactor*inputdata[i].weight, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg)/inputdata[i].weight;
       if (DoInterlacing) add_to_grid(inputdata[i].coord[0]+dx/2.0, inputdata[i].coord[1]+dy/2.0, inputdata[i].coord[2]+dz/2.0, prefactor*inputdata[i].weight, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
-      if (Momentum) {
+      if (Momentum && data) {
         add_to_grid(inputdata[i].coord[0], inputdata[i].coord[1], inputdata[i].coord[2], prefactor*inputdata[i].pv*inputdata[i].weight_pv, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom);
         if (DoInterlacing) add_to_grid(inputdata[i].coord[0]+dx/2.0, inputdata[i].coord[1]+dy/2.0, inputdata[i].coord[2]+dz/2.0, prefactor*inputdata[i].pv*inputdata[i].weight_pv, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom_interlace);  
       }

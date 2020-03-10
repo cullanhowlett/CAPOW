@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
       compute_fkp(NDATA, data);
       if (Momentum != 1) compute_fkp(NRAND, randoms);
     }
-    assign_survey_data(NDATA, data, 1.0);
+    assign_survey_data(NDATA, data, 1.0, 1);
   }
 
   if (ThisTask == 0) {
@@ -206,7 +206,7 @@ int main(int argc, char **argv) {
     }
   } else if (Survey) {
     // Subtract the random counts
-    if (Momentum != 1) assign_survey_data(NRAND, randoms, -alpha);
+    if (Momentum != 1) assign_survey_data(NRAND, randoms, -alpha, 0);
 
     // Copy across the extra slices from the task on the left and add it to the leftmost slices
     // of the task on the right. Skip over tasks without any slices.
