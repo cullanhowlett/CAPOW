@@ -224,7 +224,7 @@ int main(int argc, char **argv) {
     }
     if ((Momentum != 0) && (Momentum != 1)) {
       if (InterpOrder > 1) {
-        double * temp_ddg = (double *)malloc(InterpOrder*alloc_slice*sizeof(double));
+        double * temp_ddg = (double *)calloc(InterpOrder*alloc_slice, sizeof(double));
         ierr = MPI_Sendrecv(&(ddg_mom[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
                             &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
         for (int i=0;i<InterpOrder*alloc_slice;i++) ddg_mom[i] += temp_ddg[i];
