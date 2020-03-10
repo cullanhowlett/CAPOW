@@ -477,7 +477,7 @@ void compute_survey_power(void) {
 	      for (int iz=0; iz<NZ; iz++) {
 	        long ind = iz+2*(NZ/2+1)*(iy+NY*ix);
 	        ddg_2[ind] = ddg[ind];
-	        ddg_interlace_2[ind] = ddg_interlace[ind];
+	        if (DoInterlacing) ddg_interlace_2[ind] = ddg_interlace[ind];
 	      }
 	    }
 	  }
@@ -490,7 +490,7 @@ void compute_survey_power(void) {
 	        for (int iz=0; iz<NZ; iz++) {
 	          long ind = iz+2*(NZ/2+1)*(iy+NY*ix);
 	          ddg_mom_2[ind] = ddg_mom[ind];
-	          ddg_mom_interlace_2[ind] = ddg_mom_interlace[ind];
+	          if (DoInterlacing) ddg_mom_interlace_2[ind] = ddg_mom_interlace[ind];
 	        }
 	      }
 	    }
