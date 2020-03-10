@@ -383,7 +383,6 @@ void compute_periodic_power(void) {
           	dkr_mom = ddg_mom[(2*k  )+2*(NZ/2+1)*(j+NY*(i-Local_x_start))];
             dki_mom = ddg_mom[(2*k+1)+2*(NZ/2+1)*(j+NY*(i-Local_x_start))]; 
             if (DoInterlacing) {
-              grid_cor *= 0.25;
               double kh = ax+ay+az;
               double sink = sin(kh);
               double cosk = cos(kh);
@@ -828,15 +827,14 @@ void assign_survey_power(int multipole, int ii, int jj, int kk) {
           }
           double dkr_mom, dki_mom;
           if ((Momentum != 0) && (Momentum != 1)) {
-          	dkr_mom = ddg_mom_2[(2*k  )+2*(NZ/2+1)*(j+NY*(i-Local_x_start))];
-            dki_mom = ddg_mom_2[(2*k+1)+2*(NZ/2+1)*(j+NY*(i-Local_x_start))]; 
+          	dkr_mom = ddg_mom_2[ind];
+            dki_mom = ddg_mom_2[ind+1]; 
             if (DoInterlacing) {
-              grid_cor *= 0.25;
               double kh = ax+ay+az;
               double sink = sin(kh);
               double cosk = cos(kh);
-              double dkr_mom_interlace_2 = ddg_mom_interlace[(2*k  )+2*(NZ/2+1)*(j+NY*(i-Local_x_start))];
-              double dki_mom_interlace_2 = ddg_mom_interlace[(2*k+1)+2*(NZ/2+1)*(j+NY*(i-Local_x_start))]; 
+              double dkr_mom_interlace_2 = ddg_mom_interlace_2[ind];
+              double dki_mom_interlace_2 = ddg_mom_interlace_2[ind+1]; 
               dkr_mom += dkr_mom_interlace_2*cosk - dki_mom_interlace_2*sink;
               dki_mom += dkr_mom_interlace_2*sink + dki_mom_interlace_2*cosk;
             }
@@ -1169,7 +1167,7 @@ void create_grids(void) {
     if ((Momentum != 0) && (Momentum != 1)) ddg_mom_interlace = (double*)calloc(Total_size,sizeof(double));
     if (Periodic) {
       plan_interlace = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_interlace,(fftw_complex*)ddg_interlace,MPI_COMM_WORLD,FFTW_ESTIMATE);   
-      if ((Momentum != 0) && (Momentum != 1)) plan_mom_interlace = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_mom,(fftw_complex*)ddg_mom,MPI_COMM_WORLD,FFTW_ESTIMATE); 
+      if ((Momentum != 0) && (Momentum != 1)) plan_mom_interlace = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_mom_interlace,(fftw_complex*)ddg_mom_interlace,MPI_COMM_WORLD,FFTW_ESTIMATE); 
     } else if (Survey) {
       ddg_interlace_2 = (double*)calloc(Total_size,sizeof(double));
       plan_interlace = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_interlace_2,(fftw_complex*)ddg_interlace_2,MPI_COMM_WORLD,FFTW_ESTIMATE);   
