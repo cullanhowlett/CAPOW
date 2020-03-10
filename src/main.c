@@ -228,7 +228,7 @@ int main(int argc, char **argv) {
         ierr = MPI_Sendrecv(&(ddg_mom[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
                             &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
         for (int i=0;i<InterpOrder*alloc_slice;i++) {
-        	if (temp_ddg[i] > 0.0) printf("%lf\n", temp_ddg[i]);
+        	if (ddg_mom[last_slice+i] > 0.0) printf("%lf, %lf\n", ddg_mom[last_slice+i], temp_ddg[i]);
         	ddg_mom[i] += temp_ddg[i];
         }
         if (DoInterlacing) {
