@@ -210,7 +210,7 @@ int main(int argc, char **argv) {
 
     // Copy across the extra slices from the task on the left and add it to the leftmost slices
     // of the task on the right. Skip over tasks without any slices.
-    if (InterpOrder > 1) {
+    /*if (InterpOrder > 1) {
       double * temp_ddg = (double *)malloc(InterpOrder*alloc_slice*sizeof(double));
       ierr = MPI_Sendrecv(&(ddg[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
                           &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
@@ -235,7 +235,7 @@ int main(int argc, char **argv) {
         }
         free(temp_ddg);
       }
-    }
+    }*/
   }
 
   if (Periodic) {
