@@ -224,10 +224,13 @@ int main(int argc, char **argv) {
     }
     if ((Momentum != 0) && (Momentum != 1)) {
       if (InterpOrder > 1) {
-        double * temp_ddg = (double *)calloc(InterpOrder*alloc_slice, sizeof(double));
+        double * temp_ddg = (double *)malloc(InterpOrder*alloc_slice*sizeof(double));
         ierr = MPI_Sendrecv(&(ddg_mom[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
                             &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
-        for (int i=0;i<InterpOrder*alloc_slice;i++) ddg_mom[i] += temp_ddg[i];
+        for (int i=0;i<InterpOrder*alloc_slice;i++) {
+        	if (temp_ddg[i] > 0.0) printf("%lf\n", temp_ddg[i]);
+        	ddg_mom[i] += temp_ddg[i];
+        }
         if (DoInterlacing) {
           ierr = MPI_Sendrecv(&(ddg_mom_interlace[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
                               &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
@@ -1101,6 +1104,7 @@ void create_grids(void) {
     Local_nxtra = Local_nx+InterpOrder;
   }
   Total_size = 2*alloc_local+InterpOrder*alloc_slice;
+  //printf("%ld, %ld, %ld\n", alloc_slice, last_slice, Total_size);
 
   if (ThisTask == 0) {
     printf("Setting neighbours...\n"); 
