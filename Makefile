@@ -9,8 +9,9 @@ EXEC = CAPOW
 #MACHINE = DOGMATIX
 #MACHINE = GETAFIX
 #MACHINE = TINAROO
-MACHINE = LAPTOP
+#MACHINE = LAPTOP
 #MACHINE = CORI
+MACHINE = OZSTAR
 
 # Options for optimization
 # ========================
@@ -82,6 +83,16 @@ ifeq ($(MACHINE),CORI)
   GSL_LIBS  = -L/global/common/sw/cray/cnl7/haswell/gsl/2.5/intel/19.0.3.199/7twqxxq/lib/ -lgsl -lgslcblas
   MPI_INCL  = -I/opt/cray/pe/mpt/7.7.6/gni/mpich-intel/16.0/include/
   MPI_LIBS  = -L/opt/cray/pe/mpt/7.7.6/gni/mpich-intel/16.0/lib/  -lmpich
+endif
+
+ifeq ($(MACHINE),OZSTAR)
+  CC = mpicc
+  FFTW_INCL = -I/apps/skylake/software/mpi/gcc/8.2.0/openmpi/4.0.0/fftw/3.3.8/include/
+  FFTW_LIBS = -L/apps/skylake/software/mpi/gcc/8.2.0/openmpi/4.0.0/fftw/3.3.8/lib -lfftw3_mpi -lfftw3
+  GSL_INCL  = -I/apps/skylake/software/compiler/gcc/8.2.0/gsl/2.5/include/
+  GSL_LIBS  = -L/apps/skylake/software/compiler/gcc/8.2.0/gsl/2.5/lib/ -lgsl -lgslcblas
+  MPI_INCL = -I/apps/skylake/software/compiler/gcc/8.2.0/openmpi/4.0.0/include/
+  MPI_LIBS = -L/apps/skylake/software/compiler/gcc/8.2.0/openmpi/4.0.0/lib -lmpi
 endif
 
 # Compile the code

@@ -183,12 +183,12 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata,
     unsigned long largelen = strlen(buf)+1;
     while(largelen <= nbuf+nleft) {
       if (randoms) {
-        if(sscanf(buf,"%lf %lf %lf %lf\n",&tx,&ty,&tz,&tnbar)!=4) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
-        tz /= LightSpeed;
+        if(sscanf(buf,"%lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tred,&tnbar,&tmass)!=6) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+        //if(sscanf(buf,"%lf %lf %lf %lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tlogdist_true,&tlogdist_err,&tlogdist,&tmass,&tmass,&tmass)!=9) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
         tw = 1.0;
       } else {
-        if(sscanf(buf,"%d %lf %lf %lf %lf %lf %lf %lf\n",&tid,&tx,&ty,&tz,&tlogdist_true,&tlogdist,&tlogdist_err,&tnbar)!=8) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
-        tz /= LightSpeed;
+        if(sscanf(buf,"%lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tred,&tnbar,&tmass)!=6) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+        //if(sscanf(buf,"%lf %lf %lf %lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tlogdist_true,&tlogdist_err,&tlogdist,&tmass,&tmass,&tmass)!=9) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
         tw = 1.0;
       }
       NREAD++;
@@ -228,7 +228,7 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata,
         tx = dist*cos(dec)*cos(ra);
         ty = dist*cos(dec)*sin(ra);
         tz = dist*sin(dec);
-        if (Momentum && randoms) tlogdist_err = 0.177*100.0*dist;
+        //if (Momentum && randoms) tlogdist_err = 0.177*100.0*dist;
       }
 
       // Check the data can fit in the grid including whatever interpolation order we are using
@@ -245,11 +245,11 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata,
       inputdata[NKEEP].weight = tw;
       if (NBAR_Column > 0) inputdata[NKEEP].nbar = tnbar;
       if (Momentum) {
-        inputdata[NKEEP].pv = log(10.0)*LightSpeed*tred*tlogdist/(1.0+tred);
+        inputdata[NKEEP].pv = tlogdist;
         if (randoms) {
           inputdata[NKEEP].pverr = tlogdist_err;
         } else {
-          inputdata[NKEEP].pverr = log(10.0)*LightSpeed*tred*tlogdist_err/(1.0+tred);
+          inputdata[NKEEP].pverr = tlogdist_err;
         }
       }
       NKEEP++;
@@ -323,7 +323,7 @@ void compute_nbar(int parallel, unsigned long long NDATA, unsigned long long NRA
 
   if (ThisTask == 0) printf("Calculating Number Density...\n");
 
-  int nbins = 200;
+  int nbins = int(ceil((REDMAXIN-REDMININ)/0.005));
   double * znbar = (double *)calloc(nbins+2, sizeof(double));
   double * nbar = (double *)calloc(nbins+2, sizeof(double));
 
