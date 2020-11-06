@@ -323,7 +323,7 @@ void compute_nbar(int parallel, unsigned long long NDATA, unsigned long long NRA
 
   if (ThisTask == 0) printf("Calculating Number Density...\n");
 
-  int nbins = int(ceil((REDMAXIN-REDMININ)/0.005));
+  int nbins = (int)(ceil((REDMAXIN-REDMININ)/0.005));
   double * znbar = (double *)calloc(nbins+2, sizeof(double));
   double * nbar = (double *)calloc(nbins+2, sizeof(double));
 
