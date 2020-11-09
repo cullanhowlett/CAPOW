@@ -144,14 +144,13 @@ int main(int argc, char **argv) {
         data_nbsqwsq_pv += data[i].weight_pv*data[i].weight_pv*data[i].nbar;
       }
     }
-    if (Momentum == 0) {
-      for (unsigned long long i=0;i<NRAND;i++) {
-        rand_nbw     += randoms[i].weight;
-        rand_nbwsq   += randoms[i].weight*randoms[i].weight;
-        rand_nbsqwsq += randoms[i].weight*randoms[i].weight*randoms[i].nbar;
+    for (unsigned long long i=0;i<NRAND;i++) {
+      rand_nbw     += randoms[i].weight;
+      rand_nbwsq   += randoms[i].weight*randoms[i].weight;
+      rand_nbsqwsq += randoms[i].weight*randoms[i].weight*randoms[i].nbar;
+      if (Momentum == 2) {
+        rand_nbsqwsq_pv += randoms[i].weight_pv*randoms[i].weight_pv*randoms[i].nbar;
       }
-    } else if (Momentum == 2) {
-      for (unsigned long long i=0;i<NRAND;i++) rand_nbw     += randoms[i].weight;
     }
 
     alpha = data_nbw/rand_nbw;
@@ -160,13 +159,13 @@ int main(int argc, char **argv) {
 
     if (Momentum == 0) {
 	  shot = data_nbwsq + rand_nbwsq;
-	  norm = data_nbsqwsq;
+	  norm = rand_nbsqwsq;
     } else if (Momentum == 1) {
       shot = data_vrsq;
-      norm = data_nbsqwsq;
+      norm = rand_nbsqwsq;
     } else {
       shot = data_vr;
-      norm = sqrt(data_nbsqwsq*data_nbsqwsq_pv);
+      norm = sqrt(rand_nbsqwsq*rand_nbsqwsq_pv);
     }
 
     if (ThisTask == 0) {
