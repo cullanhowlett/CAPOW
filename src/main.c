@@ -79,16 +79,17 @@ int main(int argc, char **argv) {
     if(!(data = (struct survey_data *) malloc(NOBJ_Max*sizeof(struct survey_data)))) { printf("Task %d unable to allocate memory for data\n", ThisTask);  FatalError("main", 72); }
     //sprintf(datafile, "%s/%s", InputDir, FileBase);
     NDATA = read_survey_serial_ascii(datafile, data, 0);
-    if (Momentum != 1) {
-      if(!(randoms = (struct survey_data *) malloc(NOBJ_Max*sizeof(struct survey_data)))) { printf("Task %d unable to allocate memory for randoms\n", ThisTask);  FatalError("main", 72); }
-      //sprintf(randfile, "%s/%s", InputDir, RandFileBase);
-      NRAND = read_survey_serial_ascii(randfile, randoms, 1);
-    }
+    //if (Momentum != 1) {
+    if(!(randoms = (struct survey_data *) malloc(NOBJ_Max*sizeof(struct survey_data)))) { printf("Task %d unable to allocate memory for randoms\n", ThisTask);  FatalError("main", 72); }
+    //sprintf(randfile, "%s/%s", InputDir, RandFileBase);
+    NRAND = read_survey_serial_ascii(randfile, randoms, 1);
+    //}
     if (NBAR_Column < 0) compute_nbar(0, NDATA, NRAND);
     if (FKP_Column < 0) {
       if (ThisTask == 0) printf("Computing FKP Weights...\n");
       compute_fkp(NDATA, data);
-      if (Momentum != 1) compute_fkp(NRAND, randoms);
+      //if (Momentum != 1) compute_fkp(NRAND, randoms);
+      compute_fkp(NRAND, randoms);
     }
     assign_survey_data(NDATA, data, 1.0, 1);
   }
