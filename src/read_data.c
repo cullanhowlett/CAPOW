@@ -369,7 +369,7 @@ void compute_nbar(int parallel, unsigned long long NDATA, unsigned long long NRA
 
   // Assign the number density to each data and random point
   for (unsigned long long i=0; i<NDATA; i++) data[i].nbar = gsl_spline_eval(nbar_spline, data[i].redshift, nbar_acc);
-  for (unsigned long long i=0; i<NRAND; i++) {randoms[i].nbar = gsl_spline_eval(nbar_spline, randoms[i].redshift, nbar_acc); printf("%12.6lf\n", randoms[i].nbar);}
+  for (unsigned long long i=0; i<NRAND; i++) randoms[i].nbar = gsl_spline_eval(nbar_spline, randoms[i].redshift, nbar_acc);
   //if (Momentum != 1) {
   //  for (unsigned long long i=0; i<NRAND; i++) randoms[i].nbar = gsl_spline_eval(nbar_spline, randoms[i].redshift, nbar_acc);
   //}
