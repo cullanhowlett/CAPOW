@@ -171,11 +171,11 @@ int main(int argc, char **argv) {
     if (ThisTask == 0) {
       if (Momentum == 0) {
 	    printf("alpha = %g\n",alpha);
-		printf("shot-noise [data, randoms]    = %g, %g\n",data_nbwsq, rand_nbwsq);
-		printf("normalisation [data, randoms] = %g, %g\n",data_nbsqwsq, rand_nbsqwsq);
+		  printf("shot-noise [data, randoms]    = %g, %g\n",data_nbwsq, rand_nbwsq);
+		  printf("normalisation [data, randoms] = %g, %g\n",data_nbsqwsq, rand_nbsqwsq);
 	  } else if (Momentum == 1) {
-		printf("shot-noise    = %g\n",data_vrsq);
-		printf("normalisation = %g\n",data_nbsqwsq);
+      printf("shot-noise [data]    = %g \n",data_vrsq);
+      printf("normalisation [data, randoms] = %g, %g\n",data_nbsqwsq, rand_nbsqwsq);
 	  } else {
 	  	printf("alpha = %g\n",alpha);
 	  	printf("shot-noise    = %g\n",data_vr);
