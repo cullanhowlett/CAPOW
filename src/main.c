@@ -132,7 +132,7 @@ int main(int argc, char **argv) {
     }
   } else if (Survey) {
     double data_nbw = 0.0, data_nbwsq = 0.0, data_nbsqwsq = 0.0, data_nbsqwsq_pv = 0.0, data_vr = 0.0, data_vrsq = 0.0; 
-    double rand_nbw = 0.0, rand_nbwsq = 0.0, rand_nbsqwsq = 0.0;
+    double rand_nbw = 0.0, rand_nbwsq = 0.0, rand_nbsqwsq = 0.0, rand_nbsqwsq_pv = 0.0;
     for (unsigned long long i=0;i<NDATA;i++) {
       data_nbw     += data[i].weight;
       data_nbwsq   += data[i].weight*data[i].weight;
