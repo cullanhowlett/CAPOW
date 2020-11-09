@@ -338,7 +338,7 @@ void compute_nbar(int parallel, unsigned long long NDATA, unsigned long long NRA
 
   // Compute the number density in redshift bins
   for (unsigned long long i=0; i<NDATA; i++) {
-    int nbin = (int)(floor((data[i].redshift-REDMIN)/redbinwidth))+1;
+    int nbin = (int)(floor((randoms[i].redshift-REDMIN)/redbinwidth))+1;
     if (nbin == nbins+1) nbin--;
     nbar[nbin]++;
   }
@@ -349,6 +349,7 @@ void compute_nbar(int parallel, unsigned long long NDATA, unsigned long long NRA
     double volume = SkyArea/(180.0*180.0)*M_PI*M_PI*(outervolume*outervolume*outervolume-innervolume*innervolume*innervolume)/3.0;
     znbar[i+1] = (i+0.5)*redbinwidth+REDMIN;
     nbar[i+1] /= volume;
+    printf("%12.6lf, %12.6lf\n", znbar[i+1], nbar[i+1]);
   }
 
   if (parallel) { 
