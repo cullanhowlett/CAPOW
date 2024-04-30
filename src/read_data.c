@@ -123,6 +123,103 @@ double read_periodic_serial_ascii(char *inputfile) {
 
 }
 
+// Read in a FITS file containing the simulation box data. 
+// Every processor reads in the file but only stores the relevant parts.
+// =====================================================================
+double read_periodic_serial_fits(char *inputfile) {
+
+  FILE * fp;
+  int bufsize = 2000;
+  char buf[bufsize];
+  double NREAD = 0, NGRID = 0, NPV = 0;
+  double XMIN_LOCAL = Local_x_start*dx+XMIN;
+  double XMAX_LOCAL = (Local_x_start+Local_nx)*dx+XMIN;
+
+  if (ThisTask == 0) {
+    printf("\nReading: %s\n", inputfile); 
+    fflush(stdout);
+  }
+
+  if (Momentum) {
+    nsq = 0.0; vr_ave = 0.0; vrsq_ave = 0.0;
+  }
+
+  // Open the file
+  if((fp=fopen(inputfile,"r"))==NULL) { printf("Task %d cannot open input file\n", ThisTask);  FatalError("read_data", 96); }
+
+  // Loop over each line and assign the particles to the grid
+  // We skip over any lines starting with `#' as we assume they are headers
+  // The exact format will likely need modifying
+  while(fgets(buf,bufsize,fp)) {
+    if(strncmp(buf,"#",1)==0) continue;
+
+    // These lines will probably need changing to match the input data format.
+    double w = 1.0;
+    double tx,ty,tz,tvx,tvy,tvz;
+    //if(sscanf(buf,"%lf %lf %lf %lf\n",&tx,&ty,&tz,&tz_rsd)!=4) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+    //tz = tz_rsd;
+    if(sscanf(buf,"%lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tvx,&tvy,&tvz)!=6) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+    double tvr = tvz;
+
+    NREAD += w;
+    if ((tx < XMIN) || (tx > XMAX) || (ty < YMIN) || (ty > YMAX) || (tz < ZMIN) || (tz > ZMAX)) {
+      printf("Task %d has particle out of grid bounds: x=%lf, y=%lf, z=%lf\n", ThisTask, tx, ty, tz);
+      FatalError("read_data", 110);
+    }
+
+    if (Momentum == 1) {
+      NGRID += add_to_grid(tx, ty, tz, w*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+    } else {
+      NGRID += add_to_grid(tx, ty, tz, w, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+      if (Momentum != 0) {
+        NPV += add_to_grid(tx, ty, tz, w*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom);
+        if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom_interlace);
+      }
+    }
+
+    if (Momentum) {
+      nsq += w*w;
+      vr_ave += w*tvr;
+      vrsq_ave += w*w*tvr*tvr;
+    }
+
+  }
+  printf("Task %d read %lf particles, gridded %lf\n", ThisTask, NREAD, NGRID);
+  fflush(stdout);
+
+  // Copy across the extra slices from the task on the left and add it to the leftmost slices
+  // of the task on the right. Skip over tasks without any slices.
+  if (InterpOrder > 0) {
+    double * temp_ddg = (double *)calloc(InterpOrder*alloc_slice,sizeof(double));
+    ierr = MPI_Sendrecv(&(ddg[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
+                        &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
+    for (int i=0;i<InterpOrder*alloc_slice;i++) ddg[i] += temp_ddg[i];
+    if (DoInterlacing) {
+      ierr = MPI_Sendrecv(&(ddg_interlace[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
+                          &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
+      for (int i=0;i<InterpOrder*alloc_slice;i++) ddg_interlace[i] += temp_ddg[i];
+    }
+    free(temp_ddg);
+    if ((Momentum != 0) && (Momentum != 1)) {
+      double * temp_ddg = (double *)calloc(InterpOrder*alloc_slice,sizeof(double));
+      ierr = MPI_Sendrecv(&(ddg_mom[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
+                          &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
+      for (int i=0;i<InterpOrder*alloc_slice;i++) ddg_mom[i] += temp_ddg[i];
+      if (DoInterlacing) {
+        ierr = MPI_Sendrecv(&(ddg_mom_interlace[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
+                            &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
+        for (int i=0;i<InterpOrder*alloc_slice;i++) ddg_mom_interlace[i] += temp_ddg[i];
+      }
+      free(temp_ddg);
+    }
+  }
+
+  return NGRID;
+
+}
+
 // Read in an ASCII file containing the survey data.
 // Every processor reads in the file but only stores the relevant parts.
 // =====================================================================
@@ -176,19 +273,19 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata,
     //printf("%s\n", largebuf);
 
     int tid, tcen;
-    double tx, ty, tz, tred, tnbar, tmass, tw;
+    double tx, ty, tz, tred, tnbar, tmass, tw, tdist;
     double tlogdist, tlogdist_true, tlogdist_err;
 
     char * buf = strtok(largebuf, "\n");
     unsigned long largelen = strlen(buf)+1;
     while(largelen <= nbuf+nleft) {
       if (randoms) {
-        if(sscanf(buf,"%lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tred,&tnbar,&tmass)!=6) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
-        //if(sscanf(buf,"%lf %lf %lf %lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tlogdist_true,&tlogdist_err,&tlogdist,&tmass,&tmass,&tmass)!=9) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+        if(sscanf(buf,"%lf %lf %lf %lf\n",&tx,&ty,&tz,&tnbar)!=4) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+        tnbar *= 1.0e-6;
         tw = 1.0;
       } else {
-        if(sscanf(buf,"%lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tred,&tnbar,&tmass)!=6) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
-        //if(sscanf(buf,"%lf %lf %lf %lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tlogdist_true,&tlogdist_err,&tlogdist,&tmass,&tmass,&tmass)!=9) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+        if(sscanf(buf,"%lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tnbar,&tlogdist,&tlogdist_err)!=6) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+        tnbar *= 1.0e-6;
         tw = 1.0;
       }
       NREAD++;
@@ -199,8 +296,6 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata,
           fflush(stdout);
         }
       }
-
-      //printf("%d, %lf, %lf, %lf, %lf, %lf, %lf, %lf\n",tid,tx,ty,tz,tlogdist_true,tlogdist,tlogdist_err,tnbar);
 
       if (Coord_Type == 0) {
         tred = gsl_spline_eval(red_spline, sqrt(tx*tx + ty*ty + tz*tz), red_acc);
@@ -219,16 +314,16 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata,
           continue;
         }
         //double dist = comoving_distance(tred);
-        double dist = gsl_spline_eval(dist_spline, tred, dist_acc);
+        tdist = gsl_spline_eval(dist_spline, tred, dist_acc);
         double ra = tx, dec = ty;
         if (Coord_Type == 1) {
           ra *= (M_PI/180.0);
           dec *= (M_PI/180.0);
         }
-        tx = dist*cos(dec)*cos(ra);
-        ty = dist*cos(dec)*sin(ra);
-        tz = dist*sin(dec);
-        //if (Momentum && randoms) tlogdist_err = 0.177*100.0*dist;
+        tx = tdist*cos(dec)*cos(ra);
+        ty = tdist*cos(dec)*sin(ra);
+        tz = tdist*sin(dec);
+        if (Momentum && randoms) tlogdist_err = 0.1;
       }
 
       // Check the data can fit in the grid including whatever interpolation order we are using
@@ -245,11 +340,13 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata,
       inputdata[NKEEP].weight = tw;
       if (NBAR_Column > 0) inputdata[NKEEP].nbar = tnbar;
       if (Momentum) {
-        inputdata[NKEEP].pv = tlogdist;
+        double q = 3.0/2.0*Omega_m - 1.0;
+        double zmod = tred*(1.0 + 0.5*(1.0 - q)*tred - 1.0/6.0*(2.0 - q - 3.0*q*q)*tred*tred);
+        inputdata[NKEEP].pv = LightSpeed*zmod*log(10.0)*tlogdist/(1.0+zmod);
         if (randoms) {
-          inputdata[NKEEP].pverr = tlogdist_err;
+          inputdata[NKEEP].pverr = LightSpeed*zmod*log(10.0)*tlogdist_err/(1.0+zmod);
         } else {
-          inputdata[NKEEP].pverr = tlogdist_err;
+          inputdata[NKEEP].pverr = LightSpeed*zmod*log(10.0)*tlogdist_err/(1.0+zmod);
         }
       }
       NKEEP++;

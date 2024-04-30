@@ -9,6 +9,7 @@ OutputDir            /Volumes/Work/UQ/DESI/MockChallenge/Stage2/    % Directory 
 FileBase             UNIT_lightcone_ELG_NGC_Z_rsd.dat       % Base-filename of files containing the data (appropriate additions are appended at runtime) 
 RandFileBase         UNIT_lightcone_ELG_rand_NGC_Z_rsd.dat  % Base-filename of files containing the randoms (if required, and appropriate additions are appended at runtime) 
 NumFilesInParallel   1                                      % Limits the number of files that are reading the inputs at once.
+InputFormat          1                                      % The format of the input file (0 = ASCII, 1 = FITS)
 
 % Grid Specifications
 % ====================

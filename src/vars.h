@@ -28,6 +28,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <complex.h>
+#include <fitsio.h>
 
 // MPI and FFTW libraries
 #include <mpi.h>

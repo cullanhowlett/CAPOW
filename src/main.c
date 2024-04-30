@@ -857,7 +857,7 @@ void assign_survey_power(int multipole, int ii, int jj, int kk) {
 	          F0_mom[ind+1] = dki_mom;
 	          power = (dkr*dki_mom-dki*dkr_mom)*grid_cor;
 	        } else if (multipole % 2) {
-	          power = 0.5*(dkr*F0_mom[ind] + dki*F0_mom[ind+1] + dkr_mom*F0[ind] + dki_mom*F0_mom[ind+1])*grid_cor;
+	          power = 0.5*(dkr*F0_mom[ind] + dki*F0_mom[ind+1] + dkr_mom*F0[ind] + dki_mom*F0[ind+1])*grid_cor;
 	        } else {
 	          power = 0.5*(dkr*F0_mom[ind+1] - dki*F0_mom[ind] + dkr_mom*F0[ind+1] - dki_mom*F0[ind])*grid_cor;
 	        }
@@ -1028,9 +1028,9 @@ void output_power(double shot, double norm, char* fout_name) {
     // Output the power spectrum values
     // You may want to change this based on your choice of output format
     if (Odd_Multipoles) {
-      fprintf(fout, "# k, pk0, pk1, pk2, pk3, pk4, Nmodes\n");
+      fprintf(fout, "# k  pk0  pk1  pk2  pk3  pk4  Nmodes\n");
     } else {
-      fprintf(fout, "# k, pk0, pk2, pk4, Nmodes\n");
+      fprintf(fout, "# k  pk0  pk2  pk4  Nmodes\n");
     }
     for(int i=0;i<NK;i++) {
       double kp;

@@ -36,6 +36,7 @@ void compute_nbar(int parallel, unsigned long long NDATA, unsigned long long NRA
 void compute_fkp(unsigned long long NOBJ, struct survey_data * inputdata);
 double f(double z, void *p);
 double comoving_distance(double red);
+double read_periodic_serial_fits(char *inputfile);
 double read_periodic_serial_ascii(char *inputfile);
 double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata, int randoms);
 double assign_survey_data(unsigned long long NOBJ, struct survey_data * inputdata, double prefactor, int data);
