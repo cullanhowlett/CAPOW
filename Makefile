@@ -12,6 +12,7 @@ EXEC = CAPOW
 MACHINE = LAPTOP
 #MACHINE = CORI
 #MACHINE = OZSTAR
+#MACHINE = PERLMUTTER
 
 # Options for optimization
 # ========================
@@ -93,6 +94,18 @@ ifeq ($(MACHINE),OZSTAR)
   GSL_LIBS  = -L/apps/skylake/software/compiler/gcc/8.2.0/gsl/2.5/lib/ -lgsl -lgslcblas
   MPI_INCL = -I/apps/skylake/software/compiler/gcc/8.2.0/openmpi/4.0.0/include/
   MPI_LIBS = -L/apps/skylake/software/compiler/gcc/8.2.0/openmpi/4.0.0/lib -lmpi
+endif
+
+ifeq ($(MACHINE),PERLMUTTER)
+  CC = cc
+  FFTW_INCL = -I/opt/cray/pe/fftw/3.3.10.6/haswell/include/
+  FFTW_LIBS = -L/opt/cray/pe/fftw/3.3.10.6/haswell/lib/ -lfftw3_mpi -lfftw3
+  GSL_INCL  = -I/usr/include/
+  GSL_LIBS  = -L/usr/lib64/ -lgsl -lgslcblas
+  MPI_INCL  = -I/opt/cray/pe/mpich/8.1.28/ofi/gnu/12.3/include/
+  MPI_LIBS  = -L/opt/cray/pe/mpich/8.1.28/ofi/gnu/12.3/lib/  -lmpich
+  FITS_INCL = -I/global/homes/c/chowlett/codes/cfitsio-4.4.0/include/
+  FITS_LIBS = -L/global/homes/c/chowlett/codes/cfitsio-4.4.0/lib/ -lcfitsio
 endif
 
 # Compile the code
