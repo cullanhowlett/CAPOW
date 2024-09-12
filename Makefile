@@ -13,6 +13,7 @@ MACHINE = LAPTOP
 #MACHINE = CORI
 #MACHINE = OZSTAR
 #MACHINE = PERLMUTTER
+#MACHINE = NT
 
 # Options for optimization
 # ========================
