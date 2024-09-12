@@ -205,12 +205,12 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata,
     unsigned long largelen = strlen(buf)+1;
     while(largelen <= nbuf+nleft) {
       if (randoms) {
-        if(sscanf(buf,"%lf %lf %lf %lf\n",&tx,&ty,&tz,&tnbar)!=4) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
-        tnbar *= 1.0e-6;
+        //if(sscanf(buf,"%lf %lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tlogdist,&tlogdist_true,&tlogdist_err,&tnbar)!=7) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+        if(sscanf(buf,"%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tlogdist_true,&tlogdist_err,&tlogdist,&tmass,&tmass,&tmass,&tnbar)!=10) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
         tw = 1.0;
       } else {
-        if(sscanf(buf,"%lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tnbar,&tlogdist,&tlogdist_err)!=6) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
-        tnbar *= 1.0e-6;
+        //if(sscanf(buf,"%lf %lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tlogdist,&tlogdist_true,&tlogdist_err,&tnbar)!=7) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+        if(sscanf(buf,"%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tlogdist_true,&tlogdist_err,&tlogdist,&tmass,&tmass,&tmass,&tnbar)!=10) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
         tw = 1.0;
       }
       NREAD++;
