@@ -1,6 +1,6 @@
 # The executable name
 # ===================
-EXEC = CAPOW
+EXEC = CAPOW_MOM
 
 # Choose the machine you are running on.
 # ==========================================================================================================
@@ -106,6 +106,16 @@ ifeq ($(MACHINE),PERLMUTTER)
   MPI_LIBS  = -L/opt/cray/pe/mpich/8.1.28/ofi/gnu/12.3/lib/  -lmpich
   FITS_INCL = -I/global/homes/c/chowlett/codes/cfitsio-4.4.0/include/
   FITS_LIBS = -L/global/homes/c/chowlett/codes/cfitsio-4.4.0/lib/ -lcfitsio
+endif
+
+ifeq ($(MACHINE),NT)
+  CC = mpicc
+  FFTW_INCL = -I/apps/modules/software/FFTW.MPI/3.3.10-gompi-2023a/include/
+  FFTW_LIBS = -L/apps/modules/software/FFTW.MPI/3.3.10-gompi-2023a/lib -lfftw3_mpi -lfftw3
+  GSL_INCL  = -I/apps/modules/software/GSL/2.7-GCC-11.3.0/include/
+  GSL_LIBS  = -L/apps/modules/software/GSL/2.7-GCC-11.3.0/lib -lgsl -lgslcblas
+  MPI_INCL = -I/apps/modules/software/OpenMPI/4.1.4-GCC-11.3.0/include/
+  MPI_LIBS = -L/apps/modules/software/OpenMPI/4.1.4-GCC-11.3.0/lib -lmpi
 endif
 
 # Compile the code
