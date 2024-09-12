@@ -116,8 +116,9 @@ int main(int argc, char **argv) {
     shot  = NPERIODIC_TOT;
     norm  = nbar*NPERIODIC_TOT;
     if (Momentum) {
-      VR_TOT /= (double)NPERIODIC_TOT;
-      VRSQ_TOT /= (double)NSQ_TOT;
+      NSQ_TOT /= (double)NTask;
+      VR_TOT /= (NPERIODIC_TOT * (double)NTask);
+      VRSQ_TOT /= (NPERIODIC_TOT * (double)NTask);
     }
     if (ThisTask == 0) {
       printf("mean          = %g\n",alpha);
@@ -130,6 +131,9 @@ int main(int argc, char **argv) {
       }
       fflush(stdout);
     }
+    if (Momentum == 1) shot = VRSQ_TOT * NSQ_TOT;
+    if (Momentum == 2) shot = VR_TOT * NPERIODIC_TOT;
+    if (Momentum > 2) shot = 0.0; 
   } else if (Survey) {
     double data_nbw = 0.0, data_nbwsq = 0.0, data_nbsqwsq = 0.0, data_nbsqwsq_pv = 0.0, data_vr = 0.0, data_vrsq = 0.0; 
     double rand_nbw = 0.0, rand_nbwsq = 0.0, rand_nbsqwsq = 0.0, rand_nbsqwsq_pv = 0.0;
@@ -137,10 +141,9 @@ int main(int argc, char **argv) {
       data_nbw     += data[i].weight;
       data_nbwsq   += data[i].weight*data[i].weight;
       data_nbsqwsq += data[i].weight*data[i].weight*data[i].nbar;
-      if (Momentum == 1) {
-        data_vrsq += data[i].weight*data[i].weight*data[i].pv*data[i].pv;
-      } else if (Momentum != 0) {
+      if (Momentum) {
         data_vr += data[i].weight*data[i].weight_pv*data[i].pv;
+        data_vrsq += data[i].weight*data[i].weight*data[i].pv*data[i].pv;
         data_nbsqwsq_pv += data[i].weight_pv*data[i].weight_pv*data[i].nbar;
       }
     }
@@ -163,8 +166,11 @@ int main(int argc, char **argv) {
     } else if (Momentum == 1) {
       shot = data_vrsq;
       norm = rand_nbsqwsq;
-    } else {
+    } else if (Momentum == 2) {
       shot = data_vr;
+      norm = sqrt(rand_nbsqwsq*rand_nbsqwsq_pv);
+    } else {
+      shot = data_vrsq;
       norm = sqrt(rand_nbsqwsq*rand_nbsqwsq_pv);
     }
 
@@ -179,7 +185,7 @@ int main(int argc, char **argv) {
 	  } else {
 	  	printf("alpha = %g\n",alpha);
 	  	printf("shot-noise    = %g\n",data_vr);
-		printf("normalisation = %g\n",norm);
+		  printf("normalisation = %g\n",norm);
 	  }
       fflush(stdout);
     }
@@ -291,6 +297,10 @@ void compute_periodic_power(void) {
   Pk0 = (double*)calloc(NK, sizeof(double));       // binned power spectrum
   Pk2 = (double*)calloc(NK, sizeof(double));       // binned power spectrum
   Pk4 = (double*)calloc(NK, sizeof(double));       // binned power spectrum
+  if (Momentum > 1) {
+    Pk1 = (double*)calloc(NK, sizeof(double));       // binned power spectrum
+    Pk3 = (double*)calloc(NK, sizeof(double));       // binned power spectrum
+  }
   Nmodes = (int*)calloc(NK, sizeof(int));        // number of modes in each bin
   
   // calculate Nyquist frequency
@@ -405,20 +415,24 @@ void compute_periodic_power(void) {
           }
 
           // Get the power, multiply by the relevant Legendre polynomials and add to the bin
-          double L2 = 0.0, L4 = 0.0;
-          if (LOS != 0) {
-            L2 = 1.5*mu*mu - 0.5;
-            L4 = 4.375*mu*mu*mu*mu - 3.75*mu*mu + 0.375;
-          }
           double power;
-          if ((Momentum == 0) || (Momentum == 1)) {
+          double L2 = 1.5*mu*mu - 0.5;
+          double L4 = 4.375*mu*mu*mu*mu - 3.75*mu*mu + 0.375;
+          if ((Momentum == 0) || (Momentum % 2 != 0)) {
             power = (dkr*dkr+dki*dki)*grid_cor;
        	  } else {
        	  	power = (dkr*dki_mom-dki*dkr_mom)*grid_cor;
        	  }
-          Pk0[kbin]   += NM*power;
-          Pk2[kbin]   += NM*L2*power;
-          Pk4[kbin]   += NM*L4*power;
+          Pk0[kbin] += NM*power;
+          Pk2[kbin] += NM*L2*power;
+          Pk4[kbin] += NM*L4*power;
+          if (Odd_Multipoles) {
+            double L3 = 2.5*mu*mu*mu - 1.5*mu;
+            Pk1[kbin] += NM*mu*power;
+            Pk3[kbin] += NM*L3*power;
+          }
+
+
           Nmodes[kbin] += NM;
           if (Output2D) {
             int mubin = (int)(mu*(float)NMU);
@@ -948,7 +962,7 @@ void output_power(double shot, double norm, char* fout_name) {
     Pk2_glob = (double*)calloc(NK, sizeof(double));
     Pk4_glob = (double*)calloc(NK, sizeof(double));
     Nmodes_glob = (int*)calloc(NK, sizeof(int));
-    if (Odd_Multipoles) {
+    if ((Odd_Multipoles)) {
       Pk1_glob = (double*)calloc(NK, sizeof(double));
       Pk3_glob = (double*)calloc(NK, sizeof(double));
     }
@@ -976,15 +990,15 @@ void output_power(double shot, double norm, char* fout_name) {
 
     FILE *fout, *fout_2D;
     char fout_name_2D[2000];
-	if((fout=fopen(fout_name,"w"))==NULL) { printf("cannot open output file: %s\n", fout_name); FatalError("read_data", 142); }
-	printf("Writing multipoles to file: %s\n",fout_name);
-	fflush(stdout);
-	if (Output2D) {
-	  sprintf(fout_name_2D, "%s_2D", fout_name);
-	  if((fout_2D=fopen(fout_name_2D,"w"))==NULL) { printf("cannot open output file: %s\n", fout_name_2D); FatalError("read_data", 142); }
-	  printf("Writing 2D power spectrum to file:%s\n",fout_name_2D);
-	  fflush(stdout);
-	}
+  	if((fout=fopen(fout_name,"w"))==NULL) { printf("cannot open output file: %s\n", fout_name); FatalError("read_data", 142); }
+  	printf("Writing multipoles to file: %s\n",fout_name);
+  	fflush(stdout);
+  	if (Output2D) {
+  	  sprintf(fout_name_2D, "%s_2D", fout_name);
+  	  if((fout_2D=fopen(fout_name_2D,"w"))==NULL) { printf("cannot open output file: %s\n", fout_name_2D); FatalError("read_data", 142); }
+  	  printf("Writing 2D power spectrum to file:%s\n",fout_name_2D);
+  	  fflush(stdout);
+  	}
 
     // Normalise and apply shot noise correction
     int * Pkfill = (int*)calloc(NK, sizeof(int));
@@ -994,7 +1008,7 @@ void output_power(double shot, double norm, char* fout_name) {
         Pk0_glob[i] /= Nmodes_glob[i]*norm; 
         Pk2_glob[i] *= 5.0/(Nmodes_glob[i]*norm);
         Pk4_glob[i] *= 9.0/(Nmodes_glob[i]*norm);
-        if (Odd_Multipoles) {
+        if ((Odd_Multipoles)) {
           Pk1_glob[i] *= 3.0/(Nmodes_glob[i]*norm);
           Pk3_glob[i] *= 7.0/(Nmodes_glob[i]*norm);
         }
@@ -1020,7 +1034,7 @@ void output_power(double shot, double norm, char* fout_name) {
         }
         printf("Last full bin: %d (k=%g)\n",i, kmax);
         fflush(stdout);
-        if (Odd_Multipoles) { Pk1_glob[i]=0.0; Pk3_glob[i]=0.0; }
+        if ((Odd_Multipoles) || (Momentum > 1)) { Pk1_glob[i]=0.0; Pk3_glob[i]=0.0; }
         Pkfill[i]=0; Pk0_glob[i]=0.0; Pk2_glob[i]=0.0; Pk4_glob[i]=0.0; Nmodes_glob[i]=0.0; break;
       }
     }   
@@ -1039,7 +1053,7 @@ void output_power(double shot, double norm, char* fout_name) {
       } else {
         kp = Mink+((float)i+0.5)*binwidth;
       }
-      if (Odd_Multipoles) {
+      if ((Odd_Multipoles) || (Momentum > 1)) {
         fprintf(fout,"%g %g %g %g %g %g %d\n",kp,Pk0_glob[i],Pk1_glob[i],Pk2_glob[i],Pk3_glob[i],Pk4_glob[i],Nmodes_glob[i]);
       } else {
         fprintf(fout,"%g %g %g %g %d\n",kp,Pk0_glob[i],Pk2_glob[i],Pk4_glob[i],Nmodes_glob[i]);
@@ -1069,7 +1083,7 @@ void output_power(double shot, double norm, char* fout_name) {
     free(Pk4_glob);
     free(Pkfill);
     free(Nmodes_glob);
-    if (Odd_Multipoles) {
+    if ((Odd_Multipoles) || (Momentum > 1)) {
       free(Pk1_glob);
       free(Pk3_glob);
     }
@@ -1095,11 +1109,7 @@ void create_grids(void) {
   ptrdiff_t alloc_local = fftw_mpi_local_size_3d(NX, NY, NZ/2+1, MPI_COMM_WORLD, &Local_nx, &Local_x_start);
   alloc_slice = 2*NY*(NZ/2+1);
   last_slice = Local_nx*alloc_slice;
-  if (Periodic) {
-    Local_nxtra = Local_nx+InterpOrder;
-  } else {
-    Local_nxtra = Local_nx+InterpOrder;
-  }
+  Local_nxtra = Local_nx+InterpOrder;
   Total_size = 2*alloc_local+InterpOrder*alloc_slice;
   //printf("%ld, %ld, %ld\n", alloc_slice, last_slice, Total_size);
 
@@ -1119,7 +1129,14 @@ void create_grids(void) {
     do {
       LeftTask--;
       if (Periodic) {
-        if(LeftTask < 0) LeftTask = NTask - 1;
+        if (LeftTask < 0) {
+          if (LOS == 0) {
+            LeftTask = NTask - 1;
+          } else {
+            LeftTask = MPI_PROC_NULL;
+            break;
+          }
+        }
       } else if (Survey) {
         if(LeftTask < 0) {
           LeftTask = MPI_PROC_NULL;
@@ -1132,7 +1149,14 @@ void create_grids(void) {
     do {
       RightTask++;
       if (Periodic) {
-        if(RightTask >= NTask) RightTask = 0;
+        if(RightTask >= NTask) {
+          if (LOS == 0) {
+            RightTask = 0;
+          } else {
+            RightTask = MPI_PROC_NULL;
+            break;
+          }
+        }
       } else if (Survey) {
         if(RightTask >= NTask) {
           RightTask = MPI_PROC_NULL;

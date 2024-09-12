@@ -101,6 +101,7 @@ extern double * Pk0, *Pk1, * Pk2, * Pk3, * Pk4, * Pk_2D; // The power spectra; m
 // Cosmology and other constants
 #define  LightSpeed  299792.458                  // The speed of light in km/s
 extern double Omega_m;                           // The matter density at the present day
+extern double Redshift;                          // The redshift (for periodic boxes)
 extern gsl_spline * red_spline, * dist_spline;   // Splines for the redshift-distance relation
 extern gsl_interp_accel * red_acc, * dist_acc;   // Splines for the redshift-distance relation
 

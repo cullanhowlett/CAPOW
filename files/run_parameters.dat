@@ -37,6 +37,7 @@ OutputLog    0       % Whether or not to output the power spectra log-spaced k b
 % Cosmology (for converting coordinates, if necessary)
 % =========
 Omega_m    0.3089    % The matter density at the present day
+Redshift   0.10      % Redshift for periodic boxes (used to add RSD if LOS != 0)
 
 % Parameters for simulation boxes
 % ===============================

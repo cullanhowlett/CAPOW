@@ -85,6 +85,7 @@ double * Pk0, *Pk1, * Pk2, * Pk3, * Pk4, * Pk_2D; // The power spectra; multipol
 
 // Cosmology and other constants
 double Omega_m;                           // The matter density at the present day
+double Redshift;                          // The redshift (for periodic boxes)
 gsl_spline * red_spline, * dist_spline;   // Splines for the redshift-distance relation
 gsl_interp_accel * red_acc, * dist_acc;   // Splines for the redshift-distance relation
 

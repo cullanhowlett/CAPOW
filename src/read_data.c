@@ -34,7 +34,7 @@ double read_periodic_serial_ascii(char *inputfile) {
   FILE * fp;
   int bufsize = 2000;
   char buf[bufsize];
-  double NREAD = 0, NGRID = 0, NPV = 0;
+  double NREAD = 0, NOUT = 0, NGRID = 0, NPV = 0;
   double XMIN_LOCAL = Local_x_start*dx+XMIN;
   double XMAX_LOCAL = (Local_x_start+Local_nx)*dx+XMIN;
 
@@ -58,136 +58,61 @@ double read_periodic_serial_ascii(char *inputfile) {
 
     // These lines will probably need changing to match the input data format.
     double w = 1.0;
-    double tx,ty,tz,tvx,tvy,tvz;
+    double tx,ty,tz,tvx,tvy,tvz,tvr;
     //if(sscanf(buf,"%lf %lf %lf %lf\n",&tx,&ty,&tz,&tz_rsd)!=4) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
     //tz = tz_rsd;
     if(sscanf(buf,"%lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tvx,&tvy,&tvz)!=6) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
-    double tvr = tvz;
+    if (LOS == 0) {
+      tvr = 0.0;
+    } else if (LOS == 1) {
+      tvr = tvx;
+      tx += tvr * (1.0 + Redshift) / (100.0*sqrt(Omega_m*pow((1.0 + Redshift),3.0) + 1.0 - Omega_m));
+    } else if (LOS == 2) {
+      tvr = tvy;
+      ty += tvr * (1.0 + Redshift) / (100.0*sqrt(Omega_m*pow((1.0 + Redshift),3.0) + 1.0 - Omega_m));
+    } else {
+      tvr = tvz;
+      tz += tvr * (1.0 + Redshift) / (100.0*sqrt(Omega_m*pow((1.0 + Redshift),3.0) + 1.0 - Omega_m));
+    }
 
-    NREAD += w;
+    NREAD += 1;
+
+    // If we are adding RSD we'll just highlight how many fall outside the boundaries, but won't error out.
     if ((tx < XMIN) || (tx > XMAX) || (ty < YMIN) || (ty > YMAX) || (tz < ZMIN) || (tz > ZMAX)) {
-      printf("Task %d has particle out of grid bounds: x=%lf, y=%lf, z=%lf\n", ThisTask, tx, ty, tz);
-      FatalError("read_data", 110);
+      if (LOS == 0) {
+        printf("Task %d has particle out of grid bounds: x=%lf, y=%lf, z=%lf\n", ThisTask, tx, ty, tz);
+        if (LOS == 0) FatalError("read_data", 110);
+      } else {
+        NOUT += 1;
+      }
     }
 
     if (Momentum == 1) {
-      NGRID += add_to_grid(tx, ty, tz, w*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
-      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+      NGRID += add_to_grid(tx, ty, tz, w, tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
     } else {
-      NGRID += add_to_grid(tx, ty, tz, w, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
-      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+      NGRID += add_to_grid(tx, ty, tz, w, 1.0, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, 1.0, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
       if (Momentum != 0) {
-        NPV += add_to_grid(tx, ty, tz, w*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom);
-        if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom_interlace);
+        NPV += add_to_grid(tx, ty, tz, w, pow(tvr, Momentum-1), XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom);
+        if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, pow(tvr, Momentum-1), XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom_interlace);
       }
     }
 
     if (Momentum) {
       nsq += w*w;
       vr_ave += w*tvr;
-      vrsq_ave += w*w*tvr*tvr;
+      vrsq_ave += w*tvr*tvr;
     }
 
   }
-  printf("Task %d read %lf particles, gridded %lf\n", ThisTask, NREAD, NGRID);
-  fflush(stdout);
-
-  // Copy across the extra slices from the task on the left and add it to the leftmost slices
-  // of the task on the right. Skip over tasks without any slices.
-  if (InterpOrder > 0) {
-    double * temp_ddg = (double *)calloc(InterpOrder*alloc_slice,sizeof(double));
-    ierr = MPI_Sendrecv(&(ddg[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
-                        &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
-    for (int i=0;i<InterpOrder*alloc_slice;i++) ddg[i] += temp_ddg[i];
-    if (DoInterlacing) {
-      ierr = MPI_Sendrecv(&(ddg_interlace[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
-                          &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
-      for (int i=0;i<InterpOrder*alloc_slice;i++) ddg_interlace[i] += temp_ddg[i];
-    }
-    free(temp_ddg);
-    if ((Momentum != 0) && (Momentum != 1)) {
-      double * temp_ddg = (double *)calloc(InterpOrder*alloc_slice,sizeof(double));
-      ierr = MPI_Sendrecv(&(ddg_mom[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
-                          &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
-      for (int i=0;i<InterpOrder*alloc_slice;i++) ddg_mom[i] += temp_ddg[i];
-      if (DoInterlacing) {
-        ierr = MPI_Sendrecv(&(ddg_mom_interlace[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
-                            &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
-        for (int i=0;i<InterpOrder*alloc_slice;i++) ddg_mom_interlace[i] += temp_ddg[i];
-      }
-      free(temp_ddg);
-    }
-  }
-
-  return NGRID;
-
-}
-
-// Read in a FITS file containing the simulation box data. 
-// Every processor reads in the file but only stores the relevant parts.
-// =====================================================================
-double read_periodic_serial_fits(char *inputfile) {
-
-  FILE * fp;
-  int bufsize = 2000;
-  char buf[bufsize];
-  double NREAD = 0, NGRID = 0, NPV = 0;
-  double XMIN_LOCAL = Local_x_start*dx+XMIN;
-  double XMAX_LOCAL = (Local_x_start+Local_nx)*dx+XMIN;
-
-  if (ThisTask == 0) {
-    printf("\nReading: %s\n", inputfile); 
+  if (LOS == 0) {
+    printf("Task %d read %lf particles, gridded %lf\n", ThisTask, NREAD, NGRID);
+    fflush(stdout);
+  } else {
+    printf("Task %d read %lf particles, gridded %lf (%lf out of bounds due to RSD)\n", ThisTask, NREAD, NGRID, NOUT);
     fflush(stdout);
   }
-
-  if (Momentum) {
-    nsq = 0.0; vr_ave = 0.0; vrsq_ave = 0.0;
-  }
-
-  // Open the file
-  if((fp=fopen(inputfile,"r"))==NULL) { printf("Task %d cannot open input file\n", ThisTask);  FatalError("read_data", 96); }
-
-  // Loop over each line and assign the particles to the grid
-  // We skip over any lines starting with `#' as we assume they are headers
-  // The exact format will likely need modifying
-  while(fgets(buf,bufsize,fp)) {
-    if(strncmp(buf,"#",1)==0) continue;
-
-    // These lines will probably need changing to match the input data format.
-    double w = 1.0;
-    double tx,ty,tz,tvx,tvy,tvz;
-    //if(sscanf(buf,"%lf %lf %lf %lf\n",&tx,&ty,&tz,&tz_rsd)!=4) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
-    //tz = tz_rsd;
-    if(sscanf(buf,"%lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tvx,&tvy,&tvz)!=6) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
-    double tvr = tvz;
-
-    NREAD += w;
-    if ((tx < XMIN) || (tx > XMAX) || (ty < YMIN) || (ty > YMAX) || (tz < ZMIN) || (tz > ZMAX)) {
-      printf("Task %d has particle out of grid bounds: x=%lf, y=%lf, z=%lf\n", ThisTask, tx, ty, tz);
-      FatalError("read_data", 110);
-    }
-
-    if (Momentum == 1) {
-      NGRID += add_to_grid(tx, ty, tz, w*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
-      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
-    } else {
-      NGRID += add_to_grid(tx, ty, tz, w, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
-      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
-      if (Momentum != 0) {
-        NPV += add_to_grid(tx, ty, tz, w*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom);
-        if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom_interlace);
-      }
-    }
-
-    if (Momentum) {
-      nsq += w*w;
-      vr_ave += w*tvr;
-      vrsq_ave += w*w*tvr*tvr;
-    }
-
-  }
-  printf("Task %d read %lf particles, gridded %lf\n", ThisTask, NREAD, NGRID);
-  fflush(stdout);
 
   // Copy across the extra slices from the task on the left and add it to the leftmost slices
   // of the task on the right. Skip over tasks without any slices.
@@ -510,14 +435,14 @@ double assign_survey_data(unsigned long long NOBJ, struct survey_data * inputdat
 
   for (unsigned long long i=0; i<NOBJ; i++) {
     if (Momentum == 1) {
-      NGRID += add_to_grid(inputdata[i].coord[0], inputdata[i].coord[1], inputdata[i].coord[2], prefactor*inputdata[i].pv*inputdata[i].weight, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg)/(inputdata[i].pv*inputdata[i].weight);
-      if (DoInterlacing) add_to_grid(inputdata[i].coord[0]+dx/2.0, inputdata[i].coord[1]+dy/2.0, inputdata[i].coord[2]+dz/2.0, prefactor*inputdata[i].pv*inputdata[i].weight, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+      NGRID += add_to_grid(inputdata[i].coord[0], inputdata[i].coord[1], inputdata[i].coord[2], inputdata[i].weight, prefactor*inputdata[i].pv, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg)/(inputdata[i].pv*inputdata[i].weight);
+      if (DoInterlacing) add_to_grid(inputdata[i].coord[0]+dx/2.0, inputdata[i].coord[1]+dy/2.0, inputdata[i].coord[2]+dz/2.0, inputdata[i].weight, prefactor*inputdata[i].pv, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
     } else {
-      NGRID += add_to_grid(inputdata[i].coord[0], inputdata[i].coord[1], inputdata[i].coord[2], prefactor*inputdata[i].weight, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg)/inputdata[i].weight;
-      if (DoInterlacing) add_to_grid(inputdata[i].coord[0]+dx/2.0, inputdata[i].coord[1]+dy/2.0, inputdata[i].coord[2]+dz/2.0, prefactor*inputdata[i].weight, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+      NGRID += add_to_grid(inputdata[i].coord[0], inputdata[i].coord[1], inputdata[i].coord[2], prefactor*inputdata[i].weight, 1.0, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg)/inputdata[i].weight;
+      if (DoInterlacing) add_to_grid(inputdata[i].coord[0]+dx/2.0, inputdata[i].coord[1]+dy/2.0, inputdata[i].coord[2]+dz/2.0, prefactor*inputdata[i].weight, 1.0, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
       if (Momentum && data) {
-        add_to_grid(inputdata[i].coord[0], inputdata[i].coord[1], inputdata[i].coord[2], prefactor*inputdata[i].pv*inputdata[i].weight_pv, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom);
-        if (DoInterlacing) add_to_grid(inputdata[i].coord[0]+dx/2.0, inputdata[i].coord[1]+dy/2.0, inputdata[i].coord[2]+dz/2.0, prefactor*inputdata[i].pv*inputdata[i].weight_pv, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom_interlace);  
+        add_to_grid(inputdata[i].coord[0], inputdata[i].coord[1], inputdata[i].coord[2], inputdata[i].weight_pv, prefactor*inputdata[i].pv, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom);
+        if (DoInterlacing) add_to_grid(inputdata[i].coord[0]+dx/2.0, inputdata[i].coord[1]+dy/2.0, inputdata[i].coord[2]+dz/2.0, inputdata[i].weight_pv, prefactor*inputdata[i].pv, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom_interlace);  
       }
     }
   }
@@ -545,7 +470,9 @@ double read_periodic_parallel_ascii(void) {
 // Written in such a way we only have to create and copy buffer slices of the grid on the right hand edge.
 // For survey data there is no wrapping, but we have already checked that there is extra grid slices on the outside to assign to.
 // ==============================================================================================================================
-double add_to_grid(double x, double y, double z, double w, double xmin, double xmax, int nx, double * density) {
+double add_to_grid(double x, double y, double z, double w, double vr, double xmin, double xmax, int nx, double * density) {
+
+  double wvr = w * vr;
 
   // Nearest Neighbour interpolation
   if (InterpOrder == 1) {
@@ -555,6 +482,8 @@ double add_to_grid(double x, double y, double z, double w, double xmin, double x
     } else { 
       if ((x < xmin) || (x > xmax)) return 0.0;
     }
+    if ((y < YMIN) || (y >= YMAX)) return 0.0;
+    if ((z < ZMIN) || (z >= ZMAX)) return 0.0;
 
     int ix = (int)(((double)x-xmin)/dx);
     int iy = (int)(((double)y-YMIN)/dy);
@@ -568,7 +497,7 @@ double add_to_grid(double x, double y, double z, double w, double xmin, double x
       printf("%d, %lf, %lf, %lf, %llu\n", ThisTask, x, y, z, ind);
       FatalError("read_data", 133);
     }
-    density[ind] += w;
+    density[ind] += wvr;
 
   // Cloud-in-Cell interpolation
   } else if (InterpOrder == 2) {
@@ -578,6 +507,8 @@ double add_to_grid(double x, double y, double z, double w, double xmin, double x
     } else { 
       if ((x < xmin) || (x > xmax)) return 0.0;
     }
+    if ((y < YMIN) || (y >= YMAX)) return 0.0;
+    if ((z < ZMIN) || (z >= ZMAX)) return 0.0;
 
     double scalex = (x-xmin)/dx;
     double scaley = (y-YMIN)/dy;
@@ -597,14 +528,10 @@ double add_to_grid(double x, double y, double z, double w, double xmin, double x
     int iyneigh = iy+1;
     int izneigh = iz+1;
     if (Periodic) {
-      if(ixneigh >= nx) ixneigh = nx;
-      if(iyneigh >= NY) {
-        iyneigh = 0;
-        if (iy >= NY) iy = NY-1;
-      }
-      if(izneigh >= NZ) {
-        izneigh = 0;
-        if (iz >= NZ) iz = NZ-1;
+      if(ixneigh == nx) ixneigh = nx-1;
+      if (LOS == 0) {
+        if(iyneigh == NY) iyneigh = 0;
+        if(izneigh == NZ) izneigh = 0;
       }
     } else if (Survey) {
       if(ixneigh == nx) {
@@ -621,25 +548,42 @@ double add_to_grid(double x, double y, double z, double w, double xmin, double x
       }
     }
 
-    density[iz+2*(NZ/2+1)*(iy+NY*ix)]           += w*itx*ity*itz;
-    density[izneigh+2*(NZ/2+1)*(iy+NY*ix)]      += w*itx*ity*idz;
-    density[iz+2*(NZ/2+1)*(iyneigh+NY*ix)]      += w*itx*idy*itz;
-    density[izneigh+2*(NZ/2+1)*(iyneigh+NY*ix)] += w*itx*idy*idz;
-
-    density[iz+2*(NZ/2+1)*(iy+NY*ixneigh)]           += w*idx*ity*itz;
-    density[izneigh+2*(NZ/2+1)*(iy+NY*ixneigh)]      += w*idx*ity*idz;
-    density[iz+2*(NZ/2+1)*(iyneigh+NY*ixneigh)]      += w*idx*idy*itz;
-    density[izneigh+2*(NZ/2+1)*(iyneigh+NY*ixneigh)] += w*idx*idy*idz;
+    density[iz+2*(NZ/2+1)*(iy+NY*ix)]           += wvr*itx*ity*itz;
+    density[iz+2*(NZ/2+1)*(iy+NY*ixneigh)]      += wvr*idx*ity*itz;
+    if (iyneigh < NY) {
+      density[iz+2*(NZ/2+1)*(iyneigh+NY*ix)]      += wvr*itx*idy*itz;
+      density[iz+2*(NZ/2+1)*(iyneigh+NY*ixneigh)] += wvr*idx*idy*itz;
+      if (izneigh < NZ) {
+        density[izneigh+2*(NZ/2+1)*(iyneigh+NY*ix)]      += wvr*itx*idy*idz;
+        density[izneigh+2*(NZ/2+1)*(iyneigh+NY*ixneigh)] += wvr*idx*idy*idz;
+      }
+    }
+    if (izneigh < NZ) {
+      density[izneigh+2*(NZ/2+1)*(iy+NY*ix)]      += wvr*itx*ity*idz;
+      density[izneigh+2*(NZ/2+1)*(iy+NY*ixneigh)] += wvr*idx*ity*idz;
+    }
 
   // Triangular-Shaped Cloud interpolation
   } else if (InterpOrder == 3) {
 
-    if (Periodic) if (x < dx) x += XMAX-XMIN;
-    if (ThisTask == NTask-1) {
-      if ((x < xmin+dx) || (x >= xmax+dx)) return 0.0;
-    } else { 
-      if ((x < xmin+dx) || (x > xmax+dx)) return 0.0;
+    if ((Periodic) && (LOS == 0)) {
+      if (x-XMIN < dx) x += XMAX-XMIN;
+      if (ThisTask == NTask-1) {
+        if ((x < xmin+dx) || (x >= xmax+dx)) return 0.0;
+      } else { 
+        if ((x < xmin+dx) || (x > xmax+dx)) return 0.0;
+      }
+    } else {
+      if (ThisTask == 0) {
+        if ((x < xmin) || (x >= xmax+dx)) return 0.0;
+      } else if (ThisTask == NTask-1) {
+        if ((x < xmin+dx) || (x >= xmax)) return 0.0;
+      } else { 
+        if ((x < xmin+dx) || (x > xmax+dx)) return 0.0;
+      }
     }
+    if ((y < YMIN) || (y >= YMAX)) return 0.0;
+    if ((z < ZMIN) || (z >= ZMAX)) return 0.0;
 
     double scalex = (x-xmin)/dx;
     double scaley = (y-YMIN)/dy;
@@ -667,19 +611,22 @@ double add_to_grid(double x, double y, double z, double w, double xmin, double x
     int ixneighhi = ix+1;
     int iyneighhi = iy+1;
     int izneighhi = iz+1; 
+
     if (Periodic) {
-      if (iyneighlow < 0) iyneighlow = NY-1;
-      if (izneighlow < 0) izneighlow = NZ-1;
-      if(ixneighhi >= nx) ixneighhi = nx;
-      if(iyneighhi >= NY) {
-        iyneighhi -= NY;
-        if(iy >= NY) iy = 0;
-        if(iyneighhi >= 1) iyneighhi = 1;
-      }
-      if(izneighhi >= NZ) {
-        izneighhi -= NZ;
-        if(iz >= NZ) iz = 0;
-        if(izneighhi >= 1) izneighhi = 1;
+      if(ixneighhi == nx) ixneighhi = nx-1;
+      if (LOS == 0) {
+        if (iyneighlow < 0) iyneighlow = NY-1;
+        if (izneighlow < 0) izneighlow = NZ-1;
+        if(iyneighhi >= NY) {
+          iyneighhi -= NY;
+          if(iy >= NY) iy = 0;
+          if(iyneighhi > 1) iyneighhi = 1;
+        }
+        if(izneighhi >= NZ) {
+          izneighhi -= NZ;
+          if(iz >= NZ) iz = 0;
+          if(izneighhi > 1) izneighhi = 1;
+        }
       }
     } else if (Survey) {
       if(ixneighhi == nx) {
@@ -699,35 +646,59 @@ double add_to_grid(double x, double y, double z, double w, double xmin, double x
       }
     }
 
-    density[izneighlow+2*(NZ/2+1)*(iyneighlow+NY*ixneighlow)] += w*isx*isy*isz;
-    density[iz+2*(NZ/2+1)*(iyneighlow+NY*ixneighlow)]         += w*isx*isy*itz;
-    density[izneighhi+2*(NZ/2+1)*(iyneighlow+NY*ixneighlow)]  += w*isx*isy*idz;
-    density[izneighlow+2*(NZ/2+1)*(iy+NY*ixneighlow)] += w*isx*ity*isz;
-    density[iz+2*(NZ/2+1)*(iy+NY*ixneighlow)]         += w*isx*ity*itz;
-    density[izneighhi+2*(NZ/2+1)*(iy+NY*ixneighlow)]  += w*isx*ity*idz;
-    density[izneighlow+2*(NZ/2+1)*(iyneighhi+NY*ixneighlow)] += w*isx*idy*isz;
-    density[iz+2*(NZ/2+1)*(iyneighhi+NY*ixneighlow)]         += w*isx*idy*itz;
-    density[izneighhi+2*(NZ/2+1)*(iyneighhi+NY*ixneighlow)]  += w*isx*idy*idz;
-
-    density[izneighlow+2*(NZ/2+1)*(iyneighlow+NY*ix)] += w*itx*isy*isz;
-    density[iz+2*(NZ/2+1)*(iyneighlow+NY*ix)]         += w*itx*isy*itz;
-    density[izneighhi+2*(NZ/2+1)*(iyneighlow+NY*ix)]  += w*itx*isy*idz;
-    density[izneighlow+2*(NZ/2+1)*(iy+NY*ix)] += w*itx*ity*isz;
-    density[iz+2*(NZ/2+1)*(iy+NY*ix)]         += w*itx*ity*itz;
-    density[izneighhi+2*(NZ/2+1)*(iy+NY*ix)]  += w*itx*ity*idz;
-    density[izneighlow+2*(NZ/2+1)*(iyneighhi+NY*ix)] += w*itx*idy*isz;
-    density[iz+2*(NZ/2+1)*(iyneighhi+NY*ix)]         += w*itx*idy*itz;
-    density[izneighhi+2*(NZ/2+1)*(iyneighhi+NY*ix)]  += w*itx*idy*idz;
-
-    density[izneighlow+2*(NZ/2+1)*(iyneighlow+NY*ixneighhi)] += w*idx*isy*isz;
-    density[iz+2*(NZ/2+1)*(iyneighlow+NY*ixneighhi)]         += w*idx*isy*itz;
-    density[izneighhi+2*(NZ/2+1)*(iyneighlow+NY*ixneighhi)]  += w*idx*isy*idz;
-    density[izneighlow+2*(NZ/2+1)*(iy+NY*ixneighhi)] += w*idx*ity*isz;
-    density[iz+2*(NZ/2+1)*(iy+NY*ixneighhi)]         += w*idx*ity*itz;
-    density[izneighhi+2*(NZ/2+1)*(iy+NY*ixneighhi)]  += w*idx*ity*idz;
-    density[izneighlow+2*(NZ/2+1)*(iyneighhi+NY*ixneighhi)] += w*idx*idy*isz;
-    density[iz+2*(NZ/2+1)*(iyneighhi+NY*ixneighhi)]         += w*idx*idy*itz;
-    density[izneighhi+2*(NZ/2+1)*(iyneighhi+NY*ixneighhi)]  += w*idx*idy*idz;
+    if ((iy < NY) && (iz < NZ)) {
+      density[iz+2*(NZ/2+1)*(iy+NY*ix)]                             += wvr*itx*ity*itz;
+      if (ixneighlow > 0) density[iz+2*(NZ/2+1)*(iy+NY*ixneighlow)] += wvr*isx*ity*itz;
+      if (ixneighhi < nx) density[iz+2*(NZ/2+1)*(iy+NY*ixneighhi)]  += wvr*idx*ity*itz;
+    }
+    if (iyneighlow > 0) {
+      if (iz < NZ) {
+        density[iz+2*(NZ/2+1)*(iyneighlow+NY*ix)]                             += wvr*itx*isy*itz;
+        if (ixneighlow > 0) density[iz+2*(NZ/2+1)*(iyneighlow+NY*ixneighlow)] += wvr*isx*isy*itz;
+        if (ixneighhi < nx) density[iz+2*(NZ/2+1)*(iyneighlow+NY*ixneighhi)]  += wvr*idx*isy*itz;
+      }
+      if (izneighlow > 0) {
+            density[izneighlow+2*(NZ/2+1)*(iyneighlow+NY*ix)]                             += wvr*itx*isy*isz;
+            if (ixneighlow > 0) density[izneighlow+2*(NZ/2+1)*(iyneighlow+NY*ixneighlow)] += wvr*isx*isy*isz;
+            if (ixneighhi < nx) density[izneighlow+2*(NZ/2+1)*(iyneighlow+NY*ixneighhi)]  += wvr*idx*isy*isz;
+      }
+      if (izneighhi < NZ) {
+            density[izneighhi+2*(NZ/2+1)*(iyneighlow+NY*ix)]                             += wvr*itx*isy*idz;
+            if (ixneighlow > 0) density[izneighhi+2*(NZ/2+1)*(iyneighlow+NY*ixneighlow)] += wvr*isx*isy*idz;
+            if (ixneighhi < nx) density[izneighhi+2*(NZ/2+1)*(iyneighlow+NY*ixneighhi)]  += wvr*idx*isy*idz;
+      }
+    }
+    if (iyneighhi < NY) {
+      if (iz < NZ) {
+        density[iz+2*(NZ/2+1)*(iyneighhi+NY*ix)]                             += wvr*itx*idy*itz;
+        if (ixneighlow > 0) density[iz+2*(NZ/2+1)*(iyneighhi+NY*ixneighlow)] += wvr*isx*idy*itz;
+        if (ixneighhi < nx) density[iz+2*(NZ/2+1)*(iyneighhi+NY*ixneighhi)]  += wvr*idx*idy*itz;
+      }
+      if (izneighlow > 0) {
+        density[izneighlow+2*(NZ/2+1)*(iyneighhi+NY*ix)]                             += wvr*itx*idy*isz;
+        if (ixneighlow > 0) density[izneighlow+2*(NZ/2+1)*(iyneighhi+NY*ixneighlow)] += wvr*isx*idy*isz;
+        if (ixneighhi < nx) density[izneighlow+2*(NZ/2+1)*(iyneighhi+NY*ixneighhi)]  += wvr*idx*idy*isz;
+      }
+      if (izneighhi < NZ) {
+        density[izneighhi+2*(NZ/2+1)*(iyneighhi+NY*ix)]                             += wvr*itx*idy*idz;
+        if (ixneighlow > 0) density[izneighhi+2*(NZ/2+1)*(iyneighhi+NY*ixneighlow)] += wvr*isx*idy*idz;
+        if (ixneighhi < nx) density[izneighhi+2*(NZ/2+1)*(iyneighhi+NY*ixneighhi)]  += wvr*idx*idy*idz;
+      }
+    }
+    if (izneighlow > 0) {
+      if (iy < NY) {
+        density[izneighlow+2*(NZ/2+1)*(iy+NY*ix)]                             += wvr*itx*ity*isz;
+        if (ixneighlow > 0) density[izneighlow+2*(NZ/2+1)*(iy+NY*ixneighlow)] += wvr*isx*ity*isz;
+        if (ixneighhi < nx) density[izneighlow+2*(NZ/2+1)*(iy+NY*ixneighhi)]  += wvr*idx*ity*isz;
+      }
+    }
+    if (izneighhi < NZ) {
+      if (iy < NY) {
+        density[izneighhi+2*(NZ/2+1)*(iy+NY*ix)]                             += wvr*itx*ity*idz;
+        if (ixneighlow > 0) density[izneighhi+2*(NZ/2+1)*(iy+NY*ixneighlow)] += wvr*isx*ity*idz;
+        if (ixneighhi < nx) density[izneighhi+2*(NZ/2+1)*(iy+NY*ixneighhi)]  += wvr*idx*ity*idz;
+      }
+    }
   }
   return w;
 }

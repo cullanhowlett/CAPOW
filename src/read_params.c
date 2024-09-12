@@ -138,6 +138,10 @@ void read_parameterfile(char * fname) {
   addr[nt] = &Omega_m;
   id[nt++] = FLOAT;
 
+  strcpy(tag[nt], "Redshift");
+  addr[nt] = &Redshift;
+  id[nt++] = FLOAT;
+
   strcpy(tag[nt], "Periodic");
   addr[nt] = &Periodic;
   id[nt++] = INT;
@@ -294,7 +298,7 @@ void check_inputs(void) {
       printf("\nERROR: `NumFilesInParallel' is less than 1 so no processors will be writing out the data.\n");
       printf("        Please set NumFileInParallel > 0'.\n\n");
     }
-    FatalError((char *)"read_param.c", 339);
+    FatalError((char *)"read_param.c", 297);
   }
 
   if (NTask < NumFilesInParallel) {
@@ -310,14 +314,7 @@ void check_inputs(void) {
         printf("\nERROR: `LOS' is neither 0 (real-space), 1, 2 nor 3.\n");
         printf("        Please choose a suitable value for `LOS'.\n\n");
       }
-      FatalError((char *)"read_param.c", 354);
-    }
-    if (Odd_Multipoles) {
-      if (ThisTask == 0) {
-        printf("\nWARNING: Odd multipoles not implemented for periodic box.\n");
-        printf("         Setting Odd_Multipoles == 0.\n\n");
-      }
-      Odd_Multipoles = 0;
+      FatalError((char *)"read_param.c", 313);
     }
   }
 
@@ -326,7 +323,7 @@ void check_inputs(void) {
       printf("\nERROR: `InterpOrder' is neither 1, 2 nor 3.\n");
       printf("        Please choose a suitable value for `InterpOrder'.\n\n");
     }
-    FatalError((char *)"read_param.c", 354);
+    FatalError((char *)"read_param.c", 329);
   }
 
   if ((DoInterlacing != 0) && (DoInterlacing != 1)) {
@@ -334,7 +331,7 @@ void check_inputs(void) {
       printf("\nERROR: `DoInterlacing' is neither 0 nor 1.\n");
       printf("        Please choose a suitable value for `DoInterlacing'.\n\n");
     }
-    FatalError((char *)"read_param.c", 354);
+    FatalError((char *)"read_param.c", 337);
   }
 
   if ((Output2D != 0) && (Output2D != 1)) {
@@ -342,7 +339,7 @@ void check_inputs(void) {
       printf("\nERROR: `Output2D' is neither 0 nor 1.\n");
       printf("        Please choose a suitable value for `Output2D'.\n\n");
     }
-    FatalError((char *)"read_param.c", 354);
+    FatalError((char *)"read_param.c", 345);
   }
 
   if (Output2D) {
@@ -351,7 +348,7 @@ void check_inputs(void) {
         printf("\nERROR: `NMU' is less than 1.  if Output2D is 1, we must choose some mu-bins to output.\n");
         printf("        Please set 'NMU' > 0.\n\n");
       }
-      FatalError((char *)"read_param.c", 370);
+      FatalError((char *)"read_param.c", 354);
     }
   }
 
@@ -360,7 +357,7 @@ void check_inputs(void) {
       printf("\nERROR: `OutputLog' is neither 0 nor 1.\n");
       printf("        Please choose a suitable value for `OutputLog'.\n\n");
     }
-    FatalError((char *)"read_param.c", 354);
+    FatalError((char *)"read_param.c", 363);
   }
 
   if (NX <= 0) {
@@ -368,23 +365,23 @@ void check_inputs(void) {
       printf("\nERROR: `NX' is less than 1. We must generate a mesh.\n");
       printf("        Please set 'NX' > 0.\n\n");
     }
-    FatalError((char *)"read_param.c", 370);
+    FatalError((char *)"read_param.c", 371);
   }
 
   if (NY <= 0) {
     if (ThisTask == 0) {
-      printf("\nERROR: `NX' is less than 1. We must generate a mesh.\n");
-      printf("        Please set 'NX' > 0.\n\n");
+      printf("\nERROR: `NY' is less than 1. We must generate a mesh.\n");
+      printf("        Please set 'NY' > 0.\n\n");
     }
-    FatalError((char *)"read_param.c", 370);
+    FatalError((char *)"read_param.c", 379);
   }
 
   if (NZ <= 0) {
     if (ThisTask == 0) {
-      printf("\nERROR: `NX' is less than 1. We must generate a mesh.\n");
-      printf("        Please set 'NX' > 0.\n\n");
+      printf("\nERROR: `NZ' is less than 1. We must generate a mesh.\n");
+      printf("        Please set 'NZ' > 0.\n\n");
     }
-    FatalError((char *)"read_param.c", 370);
+    FatalError((char *)"read_param.c", 387);
   }
 
   if (NK <= 0) {
@@ -392,7 +389,7 @@ void check_inputs(void) {
       printf("\nERROR: `NK' is less than 1. We must choose some k-bins to output.\n");
       printf("        Please set 'NK' > 0.\n\n");
     }
-    FatalError((char *)"read_param.c", 370);
+    FatalError((char *)"read_param.c", 395);
   }
 
   if (XMAX < XMIN) {
@@ -400,7 +397,7 @@ void check_inputs(void) {
       printf("\nERROR: `XMAX' is less than `XMIN'.\n");
       printf("        Please set `XMAX' > `XMIN'.\n\n");
     }
-    FatalError((char *)"read_param.c", 378);
+    FatalError((char *)"read_param.c", 403);
   }
 
   if (YMAX < YMIN) {
@@ -408,7 +405,7 @@ void check_inputs(void) {
       printf("\nERROR: `XMAX' is less than `XMIN'.\n");
       printf("        Please set `XMAX' > `XMIN'.\n\n");
     }
-    FatalError((char *)"read_param.c", 378);
+    FatalError((char *)"read_param.c", 411);
   }
 
   if (ZMAX < ZMIN) {
@@ -416,7 +413,7 @@ void check_inputs(void) {
       printf("\nERROR: `XMAX' is less than `XMIN'.\n");
       printf("        Please set `XMAX' > `XMIN'.\n\n");
     }
-    FatalError((char *)"read_param.c", 378);
+    FatalError((char *)"read_param.c", 419);
   }
 
   if (Maxk < Mink) {
@@ -424,7 +421,7 @@ void check_inputs(void) {
       printf("\nERROR: `Maxk' is less than `Mink'.\n");
       printf("        Please set `Maxk' > `Mink'.\n\n");
     }
-    FatalError((char *)"read_param.c", 378);
+    FatalError((char *)"read_param.c", 427);
   }
 
   return;
