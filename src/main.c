@@ -104,21 +104,26 @@ int main(int argc, char **argv) {
   // needed for the mean density, shot-noise and normalisation
   double alpha, shot, norm;
   if (Periodic) {
-    double NPERIODIC_TOT = 0, NSQ_TOT = 0.0, VR_TOT = 0.0, VRSQ_TOT = 0.0;
+    double NPERIODIC_TOT = 0, NSQ_TOT = 0.0, VR_TOT = 0.0, VR2_TOT = 0.0, VR3_TOT = 0.0, VR4_TOT = 0.0;
     MPI_Allreduce(&NPERIODIC, &NPERIODIC_TOT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     if (Momentum) {
    	  MPI_Allreduce(&nsq, &NSQ_TOT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
       MPI_Allreduce(&vr_ave, &VR_TOT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-      MPI_Allreduce(&vrsq_ave, &VRSQ_TOT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+      MPI_Allreduce(&vr2_ave, &VR2_TOT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+      MPI_Allreduce(&vr3_ave, &VR3_TOT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+      MPI_Allreduce(&vr4_ave, &VR4_TOT, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
     }
     alpha  = NPERIODIC_TOT/((double)NX*(double)NY*(double)NZ);
     double nbar  = NPERIODIC_TOT/((XMAX-XMIN)*(YMAX-YMIN)*(ZMAX-ZMIN));
-    shot  = NPERIODIC_TOT;
+    shot  = NPERIODIC_TOT;   //P00
     norm  = nbar*NPERIODIC_TOT;
     if (Momentum) {
       NSQ_TOT /= (double)NTask;
-      VR_TOT /= (NPERIODIC_TOT * (double)NTask);
-      VRSQ_TOT /= (NPERIODIC_TOT * (double)NTask);
+      VR_TOT /= (NSQ_TOT * (double)NTask);
+      VR2_TOT /= (NSQ_TOT * (double)NTask);
+      VR3_TOT /= (NSQ_TOT * (double)NTask);
+      VR4_TOT /= (NSQ_TOT * (double)NTask);
     }
     if (ThisTask == 0) {
       printf("mean          = %g\n",alpha);
@@ -127,13 +132,20 @@ int main(int argc, char **argv) {
       printf("normalisation = %g\n",norm);
       if (Momentum) {
       	printf("vr_ave = %g\n",VR_TOT);
-        printf("vrsq_ave = %g\n",VRSQ_TOT); 
+        printf("vr2_ave = %g\n",VR2_TOT); 
+        printf("vr3_ave = %g\n",VR3_TOT); 
+        printf("vr4_ave = %g\n",VR4_TOT); 
       }
       fflush(stdout);
     }
-    if (Momentum == 1) shot = VRSQ_TOT * NSQ_TOT;
-    if (Momentum == 2) shot = VR_TOT * NPERIODIC_TOT;
-    if (Momentum > 2) shot = 0.0; 
+    if (Momentum == 1) shot = VR_TOT * NPERIODIC_TOT;   //P01
+    if (Momentum == 2) shot = VR2_TOT * NPERIODIC_TOT; //P11
+    if (Momentum == 3) shot = VR2_TOT * NPERIODIC_TOT; //P02
+    if (Momentum == 4) shot = VR3_TOT * NPERIODIC_TOT;  //P12
+    if (Momentum == 5) shot = VR4_TOT * NPERIODIC_TOT;  //P22
+    if (Momentum == 6) shot = VR3_TOT * NPERIODIC_TOT;  //P03
+    if (Momentum == 7) shot = VR4_TOT * NPERIODIC_TOT;  //P13
+    if (Momentum == 8) shot = VR4_TOT * NPERIODIC_TOT;  //P04
   } else if (Survey) {
     double data_nbw = 0.0, data_nbwsq = 0.0, data_nbsqwsq = 0.0, data_nbsqwsq_pv = 0.0, data_vr = 0.0, data_vrsq = 0.0; 
     double rand_nbw = 0.0, rand_nbwsq = 0.0, rand_nbsqwsq = 0.0, rand_nbsqwsq_pv = 0.0;
@@ -169,24 +181,24 @@ int main(int argc, char **argv) {
     } else if (Momentum == 2) {
       shot = data_vr;
       norm = sqrt(rand_nbsqwsq*rand_nbsqwsq_pv);
-    } else {
+    } else if (Momentum == 3) {
       shot = data_vrsq;
       norm = sqrt(rand_nbsqwsq*rand_nbsqwsq_pv);
     }
 
     if (ThisTask == 0) {
       if (Momentum == 0) {
-	    printf("alpha = %g\n",alpha);
-		  printf("shot-noise [data, randoms]    = %g, %g\n",data_nbwsq, rand_nbwsq);
-		  printf("normalisation [data, randoms] = %g, %g\n",data_nbsqwsq, rand_nbsqwsq);
-	  } else if (Momentum == 1) {
-      printf("shot-noise [data]    = %g \n",data_vrsq);
-      printf("normalisation [data, randoms] = %g, %g\n",data_nbsqwsq, rand_nbsqwsq);
-	  } else {
-	  	printf("alpha = %g\n",alpha);
-	  	printf("shot-noise    = %g\n",data_vr);
-		  printf("normalisation = %g\n",norm);
-	  }
+	      printf("alpha = %g\n",alpha);
+		    printf("shot-noise [data, randoms]    = %g, %g\n",data_nbwsq, rand_nbwsq);
+		    printf("normalisation [data, randoms] = %g, %g\n",data_nbsqwsq, rand_nbsqwsq);
+	    } else if (Momentum == 1) {
+        printf("shot-noise [data]    = %g \n",data_vrsq);
+        printf("normalisation [data, randoms] = %g, %g\n",data_nbsqwsq, rand_nbsqwsq);
+	    } else {
+	  	  printf("alpha = %g\n",alpha);
+	  	  printf("shot-noise    = %g\n",data_vr);
+		    printf("normalisation = %g\n",norm);
+	    }
       fflush(stdout);
     }
   }
@@ -198,7 +210,8 @@ int main(int argc, char **argv) {
   }
   if (Periodic) {
     // Subtract the mean density off of each cell
-    if (Momentum != 1) {
+    // P00, P01, P11, P02, P12, P22, P03, P13, P04
+    if ((Momentum == 0) | (Momentum == 1) | (Momentum == 3) | (Momentum == 6) | (Momentum == 8)) {
       int i, j, k;
       for (i=0; i<Local_nx; i++) {
         for (j=0; j<NY; j++) {
@@ -252,7 +265,7 @@ int main(int argc, char **argv) {
     }
     fftw_execute(plan);
     if (DoInterlacing) fftw_execute(plan_interlace);
-    if ((Momentum != 0) && (Momentum != 1)) {
+    if ((Momentum != 0) && (Momentum != 2) && (Momentum != 5)){
    	  fftw_execute(plan_mom);
       if (DoInterlacing) fftw_execute(plan_mom_interlace);
     }
@@ -297,7 +310,7 @@ void compute_periodic_power(void) {
   Pk0 = (double*)calloc(NK, sizeof(double));       // binned power spectrum
   Pk2 = (double*)calloc(NK, sizeof(double));       // binned power spectrum
   Pk4 = (double*)calloc(NK, sizeof(double));       // binned power spectrum
-  if (Momentum > 1) {
+  if (Odd_Multipoles) {
     Pk1 = (double*)calloc(NK, sizeof(double));       // binned power spectrum
     Pk3 = (double*)calloc(NK, sizeof(double));       // binned power spectrum
   }
@@ -389,7 +402,8 @@ void compute_periodic_power(void) {
             dki += dkr_interlace*sink + dki_interlace*cosk;
           }
           double dkr_mom, dki_mom;
-          if ((Momentum != 0) && (Momentum != 1)) {
+          // P00, P01, P11, P02, P12, P22, P03, P13, P04
+          if ((Momentum == 1) | (Momentum == 3) | (Momentum == 4) | (Momentum >= 6)) {
           	dkr_mom = ddg_mom[(2*k  )+2*(NZ/2+1)*(j+NY*(i-Local_x_start))];
             dki_mom = ddg_mom[(2*k+1)+2*(NZ/2+1)*(j+NY*(i-Local_x_start))]; 
             if (DoInterlacing) {
@@ -418,11 +432,13 @@ void compute_periodic_power(void) {
           double power;
           double L2 = 1.5*mu*mu - 0.5;
           double L4 = 4.375*mu*mu*mu*mu - 3.75*mu*mu + 0.375;
-          if ((Momentum == 0) || (Momentum % 2 != 0)) {
+          if ((Momentum == 0) | (Momentum == 2) | (Momentum == 5)) {
             power = (dkr*dkr+dki*dki)*grid_cor;
+       	  } else if ((Momentum == 1) | (Momentum == 4) | (Momentum == 6)) {
+       	  	power = (dkr*dki_mom - dki*dkr_mom)*grid_cor;
        	  } else {
-       	  	power = (dkr*dki_mom-dki*dkr_mom)*grid_cor;
-       	  }
+            power = (dkr*dkr_mom + dki*dki_mom)*grid_cor;
+          }
           Pk0[kbin] += NM*power;
           Pk2[kbin] += NM*L2*power;
           Pk4[kbin] += NM*L4*power;
@@ -962,7 +978,7 @@ void output_power(double shot, double norm, char* fout_name) {
     Pk2_glob = (double*)calloc(NK, sizeof(double));
     Pk4_glob = (double*)calloc(NK, sizeof(double));
     Nmodes_glob = (int*)calloc(NK, sizeof(int));
-    if ((Odd_Multipoles)) {
+    if (Odd_Multipoles) {
       Pk1_glob = (double*)calloc(NK, sizeof(double));
       Pk3_glob = (double*)calloc(NK, sizeof(double));
     }
@@ -1034,7 +1050,7 @@ void output_power(double shot, double norm, char* fout_name) {
         }
         printf("Last full bin: %d (k=%g)\n",i, kmax);
         fflush(stdout);
-        if ((Odd_Multipoles) || (Momentum > 1)) { Pk1_glob[i]=0.0; Pk3_glob[i]=0.0; }
+        if (Odd_Multipoles) { Pk1_glob[i]=0.0; Pk3_glob[i]=0.0; }
         Pkfill[i]=0; Pk0_glob[i]=0.0; Pk2_glob[i]=0.0; Pk4_glob[i]=0.0; Nmodes_glob[i]=0.0; break;
       }
     }   
@@ -1042,8 +1058,12 @@ void output_power(double shot, double norm, char* fout_name) {
     // Output the power spectrum values
     // You may want to change this based on your choice of output format
     if (Odd_Multipoles) {
+      fprintf(fout, "# shot = %g\n", shot/norm);
+      fprintf(fout, "# norm = %g\n", norm);
       fprintf(fout, "# k  pk0  pk1  pk2  pk3  pk4  Nmodes\n");
     } else {
+      fprintf(fout, "# shot = %g\n", shot/norm);
+      fprintf(fout, "# norm = %g\n", norm);
       fprintf(fout, "# k  pk0  pk2  pk4  Nmodes\n");
     }
     for(int i=0;i<NK;i++) {
@@ -1053,7 +1073,7 @@ void output_power(double shot, double norm, char* fout_name) {
       } else {
         kp = Mink+((float)i+0.5)*binwidth;
       }
-      if ((Odd_Multipoles) || (Momentum > 1)) {
+      if (Odd_Multipoles) {
         fprintf(fout,"%g %g %g %g %g %g %d\n",kp,Pk0_glob[i],Pk1_glob[i],Pk2_glob[i],Pk3_glob[i],Pk4_glob[i],Nmodes_glob[i]);
       } else {
         fprintf(fout,"%g %g %g %g %d\n",kp,Pk0_glob[i],Pk2_glob[i],Pk4_glob[i],Nmodes_glob[i]);
@@ -1062,6 +1082,8 @@ void output_power(double shot, double norm, char* fout_name) {
     fclose(fout);
    
     if (Output2D) {
+      fprintf(fout_2D, "# shot = %g", shot/norm);
+      fprintf(fout_2D, "# norm = %g", norm);
       fprintf(fout_2D, "# k, mu, pk, Nmodes\n");
       for(int i=0;i<NK;i++) {
         double kp;
@@ -1083,7 +1105,7 @@ void output_power(double shot, double norm, char* fout_name) {
     free(Pk4_glob);
     free(Pkfill);
     free(Nmodes_glob);
-    if ((Odd_Multipoles) || (Momentum > 1)) {
+    if (Odd_Multipoles) {
       free(Pk1_glob);
       free(Pk3_glob);
     }
@@ -1173,10 +1195,10 @@ void create_grids(void) {
 
   // Allocate the grids and create the FFTW plan
   ddg = (double*)calloc(Total_size,sizeof(double));
-  if ((Momentum != 0) && (Momentum != 1)) ddg_mom = (double*)calloc(Total_size,sizeof(double));
+  if ((Momentum != 0) && (Momentum != 2) && (Momentum != 5)) ddg_mom = (double*)calloc(Total_size,sizeof(double));
   if (Periodic) {
     plan = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg,(fftw_complex*)ddg,MPI_COMM_WORLD,FFTW_ESTIMATE); 
-    if ((Momentum != 0) && (Momentum != 1)) plan_mom = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_mom,(fftw_complex*)ddg_mom,MPI_COMM_WORLD,FFTW_ESTIMATE); 
+    if ((Momentum != 0) && (Momentum != 2) && (Momentum != 5)) plan_mom = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_mom,(fftw_complex*)ddg_mom,MPI_COMM_WORLD,FFTW_ESTIMATE); 
   } else if (Survey) {
     ddg_2 = (double*)calloc(Total_size,sizeof(double));
     plan = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_2,(fftw_complex*)ddg_2,MPI_COMM_WORLD,FFTW_ESTIMATE); 
@@ -1189,10 +1211,10 @@ void create_grids(void) {
   }
   if (DoInterlacing) {
     ddg_interlace = (double*)calloc(Total_size,sizeof(double));
-    if ((Momentum != 0) && (Momentum != 1)) ddg_mom_interlace = (double*)calloc(Total_size,sizeof(double));
+    if ((Momentum != 0) && (Momentum != 2) && (Momentum != 5)) ddg_mom_interlace = (double*)calloc(Total_size,sizeof(double));
     if (Periodic) {
       plan_interlace = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_interlace,(fftw_complex*)ddg_interlace,MPI_COMM_WORLD,FFTW_ESTIMATE);   
-      if ((Momentum != 0) && (Momentum != 1)) plan_mom_interlace = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_mom_interlace,(fftw_complex*)ddg_mom_interlace,MPI_COMM_WORLD,FFTW_ESTIMATE); 
+      if ((Momentum != 0) && (Momentum != 2) && (Momentum != 5)) plan_mom_interlace = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_mom_interlace,(fftw_complex*)ddg_mom_interlace,MPI_COMM_WORLD,FFTW_ESTIMATE); 
     } else if (Survey) {
       ddg_interlace_2 = (double*)calloc(Total_size,sizeof(double));
       plan_interlace = fftw_mpi_plan_dft_r2c_3d(NX,NY,NZ,ddg_interlace_2,(fftw_complex*)ddg_interlace_2,MPI_COMM_WORLD,FFTW_ESTIMATE);   
@@ -1233,7 +1255,7 @@ void create_grids(void) {
 void destroy_grids(void) {
   fftw_destroy_plan(plan);
   free(ddg);
-  if ((Momentum != 0) && (Momentum != 1)) {
+  if ((Momentum != 0) && (Momentum != 2) && (Momentum != 5)) {
   	fftw_destroy_plan(plan_mom);
   	free(ddg_mom);
   }
@@ -1248,7 +1270,7 @@ void destroy_grids(void) {
   if (DoInterlacing) {
     fftw_destroy_plan(plan_interlace);
     free(ddg_interlace);
-    if ((Momentum != 0) && (Momentum != 1)) {
+    if ((Momentum != 0) && (Momentum != 2) && (Momentum != 5)) {
   	  fftw_destroy_plan(plan_mom_interlace);
   	  free(ddg_mom_interlace);
     }

@@ -1,6 +1,6 @@
 # The executable name
 # ===================
-EXEC = CAPOW_MOM
+EXEC = CAPOW
 
 # Choose the machine you are running on.
 # ==========================================================================================================
@@ -68,13 +68,13 @@ ifeq ($(MACHINE),TINAROO)
 endif
 
 ifeq ($(MACHINE),LAPTOP)
-  CC = /usr/local/bin/mpicc
-  FFTW_INCL = -I/usr/local/include/
-  FFTW_LIBS = -L/usr/local/lib/ -lfftw3_mpi -lfftw3
-  GSL_INCL  = -I/usr/local/include/gsl/
-  GSL_LIBS  = -L/usr/local/lib/ -lgsl -lgslcblas
-  MPI_INCL  = -I/usr/local/include/openmpi/
-  MPI_LIBS  = -L/usr/local/lib/openmpi/  -lmpi
+  CC = /opt/homebrew/bin/mpicc
+  FFTW_INCL = -I/opt/homebrew/include/
+  FFTW_LIBS = -L/opt/homebrew/lib/ -lfftw3_mpi -lfftw3
+  GSL_INCL  = -I/opt/homebrew/include/gsl/
+  GSL_LIBS  = -L/opt/homebrew/lib/ -lgsl -lgslcblas
+  MPI_INCL  = -I/opt/homebrew/include/openmpi/
+  MPI_LIBS  = -L/opt/homebrew/lib/openmpi/  -lmpi
 endif
 
 ifeq ($(MACHINE),CORI)

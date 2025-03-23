@@ -28,7 +28,6 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <complex.h>
-#include <fitsio.h>
 
 // MPI and FFTW libraries
 #include <mpi.h>
@@ -131,7 +130,7 @@ extern double REDMAXIN;       // The maximum redshift to include in the input
 extern double X_Origin;   // The coodinate of the observer in the box in the x-direction
 extern double Y_Origin;   // The coodinate of the observer in the box in the y-direction
 extern double Z_Origin;   // The coodinate of the observer in the box in the z-direction
-extern double nsq, vr_ave, vrsq_ave; // Variables needed for momentum power spectra 
+extern double nsq, vr_ave, vrsq_ave, vr3_ave, vr4_ave; // Variables needed for momentum power spectra 
 
 // Structures for survey data
 extern struct survey_data { 

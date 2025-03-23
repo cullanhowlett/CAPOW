@@ -44,7 +44,7 @@ double read_periodic_serial_ascii(char *inputfile) {
   }
 
   if (Momentum) {
-    nsq = 0.0; vr_ave = 0.0; vrsq_ave = 0.0;
+    nsq = 0.0; vr_ave = 0.0; vrsq_ave = 0.0; vr3_ave = 0.0; vr4_ave = 0.0;
   }
 
   // Open the file
@@ -63,7 +63,7 @@ double read_periodic_serial_ascii(char *inputfile) {
     //tz = tz_rsd;
     if(sscanf(buf,"%lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tvx,&tvy,&tvz)!=6) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
     if (LOS == 0) {
-      tvr = 0.0;
+      tvr = tvz;
     } else if (LOS == 1) {
       tvr = tvx;
       tx += tvr * (1.0 + Redshift) / (100.0*sqrt(Omega_m*pow((1.0 + Redshift),3.0) + 1.0 - Omega_m));
@@ -87,25 +87,58 @@ double read_periodic_serial_ascii(char *inputfile) {
       }
     }
 
-    if (Momentum == 1) {
+    // P00, P01, P11, P02, P12, P22, P03, P13, P04
+    if (Momentum == 0) {
+      NGRID += add_to_grid(tx, ty, tz, w, 1.0, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, 1.0, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace); 
+    } else if (Momentum == 1) {
+      NGRID += add_to_grid(tx, ty, tz, w, 1.0, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, 1.0, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace); 
+      NPV += add_to_grid(tx, ty, tz, w, tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom_interlace);
+    } else if (Momentum == 2) {
       NGRID += add_to_grid(tx, ty, tz, w, tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
       if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+    } else if (Momentum == 3) {
+      NGRID += add_to_grid(tx, ty, tz, w, 1.0, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, 1.0, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+      NPV += add_to_grid(tx, ty, tz, w, tvr*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, tvr*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom_interlace);
+    } else if (Momentum == 4) {
+      NGRID += add_to_grid(tx, ty, tz, w, tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+      NPV += add_to_grid(tx, ty, tz, w, tvr*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, tvr*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom_interlace);
+    } else if (Momentum == 5) {
+      NGRID += add_to_grid(tx, ty, tz, w, tvr*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, tvr*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+    } else if (Momentum == 6) {
+      NGRID += add_to_grid(tx, ty, tz, w, 1.0, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, 1.0, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+      NPV += add_to_grid(tx, ty, tz, w, tvr*tvr*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, tvr*tvr*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom_interlace);
+    } else if (Momentum == 7) {
+      NGRID += add_to_grid(tx, ty, tz, w, tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
+      NPV += add_to_grid(tx, ty, tz, w, tvr*tvr*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, tvr*tvr*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom_interlace);
     } else {
       NGRID += add_to_grid(tx, ty, tz, w, 1.0, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg);
       if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, 1.0, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_interlace);
-      if (Momentum != 0) {
-        NPV += add_to_grid(tx, ty, tz, w, pow(tvr, Momentum-1), XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom);
-        if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, pow(tvr, Momentum-1), XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom_interlace);
-      }
+      NPV += add_to_grid(tx, ty, tz, w, tvr*tvr*tvr*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom);
+      if (DoInterlacing) add_to_grid(tx+dx/2.0, ty+dy/2.0, tz+dz/2.0, w, tvr*tvr*tvr*tvr, XMIN_LOCAL, XMAX_LOCAL, Local_nxtra, ddg_mom_interlace);
     }
 
     if (Momentum) {
-      nsq += w*w;
+      nsq += w;
       vr_ave += w*tvr;
       vrsq_ave += w*tvr*tvr;
+      vr3_ave += w*tvr*tvr*tvr;
+      vr4_ave += w*tvr*tvr*tvr*tvr;
     }
 
   }
+
   if (LOS == 0) {
     printf("Task %d read %lf particles, gridded %lf\n", ThisTask, NREAD, NGRID);
     fflush(stdout);
@@ -127,7 +160,7 @@ double read_periodic_serial_ascii(char *inputfile) {
       for (int i=0;i<InterpOrder*alloc_slice;i++) ddg_interlace[i] += temp_ddg[i];
     }
     free(temp_ddg);
-    if ((Momentum != 0) && (Momentum != 1)) {
+    if ((Momentum != 0) && (Momentum != 2) && (Momentum != 5)) {
       double * temp_ddg = (double *)calloc(InterpOrder*alloc_slice,sizeof(double));
       ierr = MPI_Sendrecv(&(ddg_mom[last_slice]),InterpOrder*alloc_slice,MPI_DOUBLE,RightTask,0,
                           &(temp_ddg[0]),InterpOrder*alloc_slice,MPI_DOUBLE,LeftTask,0,MPI_COMM_WORLD,&status);
