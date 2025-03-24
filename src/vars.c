@@ -115,7 +115,7 @@ double REDMAXIN;       // The maximum redshift to include in the input
 double X_Origin;   // The coodinate of the observer in the box in the x-direction
 double Y_Origin;   // The coodinate of the observer in the box in the y-direction
 double Z_Origin;   // The coodinate of the observer in the box in the z-direction
-double nsq, vr_ave, vrsq_ave, vr3_ave, vr4_ave; // Variables needed for momentum power spectra 
+double nsq, vr_ave, vr2_ave, vr3_ave, vr4_ave; // Variables needed for momentum power spectra 
 
 struct survey_data * data, * randoms;  // Structures for survey data
 
