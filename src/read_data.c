@@ -44,7 +44,7 @@ double read_periodic_serial_ascii(char *inputfile) {
   }
 
   if (Momentum) {
-    nsq = 0.0; vr_ave = 0.0; vrsq_ave = 0.0; vr3_ave = 0.0; vr4_ave = 0.0;
+    nsq = 0.0; vr_ave = 0.0; vr2_ave = 0.0; vr3_ave = 0.0; vr4_ave = 0.0;
   }
 
   // Open the file
@@ -132,7 +132,7 @@ double read_periodic_serial_ascii(char *inputfile) {
     if (Momentum) {
       nsq += w;
       vr_ave += w*tvr;
-      vrsq_ave += w*tvr*tvr;
+      vr2_ave += w*tvr*tvr;
       vr3_ave += w*tvr*tvr*tvr;
       vr4_ave += w*tvr*tvr*tvr*tvr;
     }
