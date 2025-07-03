@@ -451,7 +451,7 @@ void compute_periodic_power(void) {
 
           Nmodes[kbin] += NM;
           if (Output2D) {
-            int mubin = (int)(mu*(float)NMU);
+            int mubin = (int)(((mu+1.0)/2.0)*(float)NMU);
             if (mubin >= NMU) mubin = NMU-1;
             int bin = kbin*NMU + mubin;
             if ((bin >= 0) && (bin < NK*NMU)) {
@@ -1082,8 +1082,8 @@ void output_power(double shot, double norm, char* fout_name) {
     fclose(fout);
    
     if (Output2D) {
-      fprintf(fout_2D, "# shot = %g", shot/norm);
-      fprintf(fout_2D, "# norm = %g", norm);
+      fprintf(fout_2D, "# shot = %g\n", shot/norm);
+      fprintf(fout_2D, "# norm = %g\n", norm);
       fprintf(fout_2D, "# k, mu, pk, Nmodes\n");
       for(int i=0;i<NK;i++) {
         double kp;
@@ -1093,7 +1093,7 @@ void output_power(double shot, double norm, char* fout_name) {
           kp = Mink+((float)i+0.5)*binwidth;
         }
         for(int j=0;j<NMU;j++) {
-          double mup = ((float)j+0.5)/NMU;
+          double mup = 2.0 * ((float)j+0.5)/NMU - 1.0;
           fprintf(fout_2D,"%g %g %g %d\n",kp,mup,Pk_2D_glob[i*NMU+j],Nmodes_2D_glob[i*NMU+j]);
         }
       }

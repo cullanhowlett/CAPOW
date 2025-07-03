@@ -230,21 +230,22 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata,
 
     //printf("%s\n", largebuf);
 
-    int tid, tcen;
-    double tx, ty, tz, tred, tnbar, tmass, tw, tdist;
+    double tid;
+    double tx, ty, tz, tred, tnbar, tnpv, tw, tdist;
     double tlogdist, tlogdist_true, tlogdist_err;
-
+    double tpv, tpv_true, tpv_err;
+      
     char * buf = strtok(largebuf, "\n");
     unsigned long largelen = strlen(buf)+1;
     while(largelen <= nbuf+nleft) {
       if (randoms) {
-        //if(sscanf(buf,"%lf %lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tlogdist,&tlogdist_true,&tlogdist_err,&tnbar)!=7) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
-        if(sscanf(buf,"%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tlogdist_true,&tlogdist_err,&tlogdist,&tmass,&tmass,&tmass,&tnbar)!=10) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
-        tw = 1.0;
+        //if(sscanf(buf,"%lf %lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tw,&tnpv,&tnbar,&tlogdist_err)!=7) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+        if(sscanf(buf,"%lf %lf %lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tw,&tnpv,&tnbar,&tlogdist_err,&tpv_err)!=8) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+        tnbar = tnpv;
       } else {
-        //if(sscanf(buf,"%lf %lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tlogdist,&tlogdist_true,&tlogdist_err,&tnbar)!=7) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
-        if(sscanf(buf,"%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tlogdist_true,&tlogdist_err,&tlogdist,&tmass,&tmass,&tmass,&tnbar)!=10) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
-        tw = 1.0;
+	    //if(sscanf(buf,"%lf %lf %lf %lf %lf %lf %lf %lf %lf\n",&tid,&tx,&ty,&tz,&tw,&tnpv,&tnbar,&tlogdist,&tlogdist_err)!=9) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+        if(sscanf(buf,"%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf\n",&tx,&ty,&tz,&tw,&tnpv,&tnbar,&tlogdist,&tlogdist_err,&tlogdist_true,&tpv,&tpv_err,&tpv_true)!=12) { printf("Task %d has error reading file: %s\n", ThisTask, buf);  FatalError("read_data", 102); }
+        tnbar = tnpv;
       }
       NREAD++;
       
@@ -271,6 +272,13 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata,
           largelen += strlen(buf)+1;
           continue;
         }
+        if (tw == 0) {
+          printf("%lf, %lf, %lf, %lf, %lf\n", tx, ty, tz, tw, tnbar);
+          buf = strtok(NULL, "\n");
+          if (buf == NULL) break;
+          largelen += strlen(buf)+1;
+          continue;
+        }
         //double dist = comoving_distance(tred);
         tdist = gsl_spline_eval(dist_spline, tred, dist_acc);
         double ra = tx, dec = ty;
@@ -281,12 +289,12 @@ double read_survey_serial_ascii(char *inputfile, struct survey_data * inputdata,
         tx = tdist*cos(dec)*cos(ra);
         ty = tdist*cos(dec)*sin(ra);
         tz = tdist*sin(dec);
-        if (Momentum && randoms) tlogdist_err = 0.1;
+        //if (Momentum && randoms) tlogdist_err = 0.1;
       }
 
       // Check the data can fit in the grid including whatever interpolation order we are using
       if ((tx < XMIN_Interp) || (tx >= XMAX_Interp) || (ty < YMIN_Interp) || (ty >= YMAX_Interp) || (tz < ZMIN_Interp) || (tz >= ZMAX_Interp)) {
-        printf("Task %d has object out of grid bounds for chosen InterpOrder: x=%lf, y=%lf, z=%lf\n", ThisTask, tx, ty, tz);
+        printf("Task %d has object out of grid bounds for chosen InterpOrder: x=%lf, y=%lf, z=%lf, red=%lf\n", ThisTask, tx, ty, tz, tred);
         FatalError("read_data", 155);
       }
 
